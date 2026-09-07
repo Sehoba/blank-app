@@ -10,7 +10,7 @@ android {
         applicationId = "de.moebelschroeder.app4"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "4.0.1-blue-nav"
+        versionCode = 3
+        versionName = "4.0.2-no-bottom-nav"
     }
 }
