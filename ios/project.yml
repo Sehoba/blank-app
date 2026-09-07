@@ -1,0 +1,24 @@
+name: MoebelSchroeder
+options:
+  bundleIdPrefix: de.moebelschroeder
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    PRODUCT_BUNDLE_IDENTIFIER: de.moebelschroeder.app
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+
+targets:
+  MoebelSchroeder:
+    type: application
+    platform: iOS
+    sources:
+      - MoebelSchroeder
+    settings:
+      base:
+        INFOPLIST_FILE: MoebelSchroeder/Info.plist
+        CODE_SIGN_STYLE: Manual
+    scheme:
+      testTargets: []
