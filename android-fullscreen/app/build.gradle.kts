@@ -7,10 +7,10 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "de.moebelschroeder.app3"
+        applicationId = "de.moebelschroeder.app4"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "3.1.1-local-redesign"
+        versionCode = 1
+        versionName = "4.0.0-extra"
     }
 }
