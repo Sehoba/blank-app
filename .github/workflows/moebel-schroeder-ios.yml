@@ -1,0 +1,56 @@
+name: Build MoebelSchroeder IPA
+
+on:
+  push:
+    branches:
+      - moebel-schroeder-ipa-build
+    paths:
+      - 'ios/**'
+      - '.github/workflows/moebel-schroeder-ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned iPhone app
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project MoebelSchroeder.xcodeproj \
+            -scheme MoebelSchroeder \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build
+
+      - name: Package unsigned IPA
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          rm -rf Payload MoebelSchroeder-unsigned.ipa
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/MoebelSchroeder.app Payload/
+          /usr/bin/zip -qry MoebelSchroeder-unsigned.ipa Payload
+          /usr/bin/unzip -t MoebelSchroeder-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoebelSchroeder-unsigned-ipa
+          path: ios/MoebelSchroeder-unsigned.ipa
+          if-no-files-found: error
