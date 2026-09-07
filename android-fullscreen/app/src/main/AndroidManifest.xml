@@ -6,8 +6,9 @@
     <application
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
-        android:icon="@drawable/app_icon"
-        android:label="Möbelschröder"
+        android:icon="@drawable/app_icon_yellow"
+        android:roundIcon="@drawable/app_icon_yellow"
+        android:label="Möbel Schröder Extra"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
