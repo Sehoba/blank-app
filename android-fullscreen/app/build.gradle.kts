@@ -3,14 +3,14 @@ plugins {
 }
 
 android {
-    namespace = "de.moebelschroeder.app2"
+    namespace = "de.moebelschroeder.app3"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "de.moebelschroeder.app2"
+        applicationId = "de.moebelschroeder.app3"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "2.1.0-mobile-layout"
+        versionCode = 1
+        versionName = "3.0.0-showroom"
     }
 }
