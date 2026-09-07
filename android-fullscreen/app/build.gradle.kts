@@ -10,7 +10,7 @@ android {
         applicationId = "de.moebelschroeder.app3"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "3.0.0-showroom"
+        versionCode = 2
+        versionName = "3.1.0-gelb-blau-redesign"
     }
 }
