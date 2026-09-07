@@ -7,7 +7,7 @@
         android:allowBackup="true"
         android:usesCleartextTraffic="false"
         android:icon="@drawable/app_icon"
-        android:label="Möbel Schröder Showroom"
+        android:label="Möbel Schröder #4"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
