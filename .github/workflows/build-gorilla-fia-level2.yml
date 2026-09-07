@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-gorilla-fia-level2.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'gorilla-fia/**'
+      - '.github/workflows/gorilla-fia-level2.yml'
   workflow_dispatch:
 
 jobs:
