@@ -3,8 +3,10 @@ package de.moebelschroeder.app;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -27,20 +29,38 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String HOME_URL = "https://moebel-schroeder.net/index.html/";
     private static final int FILE_CHOOSER_REQUEST = 1001;
+    private static final String PREFS = "display_settings";
+
+    private static final String[] BACKGROUNDS = {
+            "#fffdf7", "#ffffff", "#f2f2f2", "#fff3b0"
+    };
+    private static final String[] BACKGROUND_NAMES = {
+            "Warm", "Weiß", "Hellgrau", "Gelb"
+    };
 
     private WebView webView;
     private ProgressBar progressBar;
     private LinearLayout errorView;
+    private LinearLayout displayControls;
     private ValueCallback<Uri[]> fileCallback;
+    private SharedPreferences prefs;
+    private int fontZoom;
+    private int backgroundIndex;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        fontZoom = prefs.getInt("fontZoom", 108);
+        backgroundIndex = prefs.getInt("backgroundIndex", 0);
+
         prepareFullscreenWindow();
         buildUi();
         configureWebView();
@@ -106,11 +126,12 @@ public class MainActivity extends Activity {
 
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.WHITE);
+        root.setBackgroundColor(0xFFFFFDF7);
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.WHITE);
+        webView.setBackgroundColor(0xFFFFFDF7);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setScrollbarFadingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -129,7 +150,7 @@ public class MainActivity extends Activity {
         errorView.setOrientation(LinearLayout.VERTICAL);
         errorView.setGravity(Gravity.CENTER);
         errorView.setPadding(dp(28), dp(28), dp(28), dp(28));
-        errorView.setBackgroundColor(Color.WHITE);
+        errorView.setBackgroundColor(0xFFFFFDF7);
         errorView.setVisibility(View.GONE);
 
         TextView title = new TextView(this);
@@ -140,7 +161,7 @@ public class MainActivity extends Activity {
         errorView.addView(title);
 
         TextView hint = new TextView(this);
-        hint.setText("Die Möbelschröder-Webseite konnte gerade nicht geladen werden.");
+        hint.setText("Die Möbel-Schröder-Webseite konnte gerade nicht geladen werden.");
         hint.setTextSize(15);
         hint.setTextColor(0xFF666666);
         hint.setGravity(Gravity.CENTER);
@@ -166,7 +187,102 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
+        displayControls = new LinearLayout(this);
+        displayControls.setOrientation(LinearLayout.HORIZONTAL);
+        displayControls.setGravity(Gravity.CENTER);
+        displayControls.setPadding(dp(5), dp(5), dp(5), dp(5));
+        displayControls.setBackground(roundedBackground(0xEE222222, 22));
+        displayControls.setElevation(dp(10));
+        displayControls.setVisibility(View.GONE);
+
+        displayControls.addView(makeControlButton("−", v -> pageZoom(0.88f)));
+        displayControls.addView(makeControlButton("+", v -> pageZoom(1.14f)));
+        displayControls.addView(makeControlButton("A−", v -> changeFont(-8)));
+        displayControls.addView(makeControlButton("A+", v -> changeFont(8)));
+        displayControls.addView(makeControlButton("◐", v -> cycleBackground()));
+
+        FrameLayout.LayoutParams controlsParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        controlsParams.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        controlsParams.bottomMargin = dp(76);
+        root.addView(displayControls, controlsParams);
+
+        Button displayButton = new Button(this);
+        displayButton.setText("Aa");
+        displayButton.setTextSize(15);
+        displayButton.setTextColor(Color.BLACK);
+        displayButton.setAllCaps(false);
+        displayButton.setPadding(0, 0, 0, 0);
+        displayButton.setMinWidth(0);
+        displayButton.setMinHeight(0);
+        displayButton.setBackground(roundedBackground(0xFFFFD400, 28));
+        displayButton.setElevation(dp(12));
+        displayButton.setOnClickListener(v -> {
+            displayControls.setVisibility(
+                    displayControls.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE
+            );
+            enterImmersiveMode();
+        });
+
+        FrameLayout.LayoutParams displayButtonParams = new FrameLayout.LayoutParams(dp(54), dp(54));
+        displayButtonParams.gravity = Gravity.BOTTOM | Gravity.END;
+        displayButtonParams.setMargins(dp(12), dp(12), dp(14), dp(14));
+        root.addView(displayButton, displayButtonParams);
+
         setContentView(root);
+    }
+
+    private Button makeControlButton(String text, View.OnClickListener listener) {
+        Button button = new Button(this);
+        button.setText(text);
+        button.setTextSize(14);
+        button.setTextColor(Color.BLACK);
+        button.setAllCaps(false);
+        button.setMinWidth(0);
+        button.setMinHeight(0);
+        button.setPadding(dp(9), 0, dp(9), 0);
+        button.setBackground(roundedBackground(0xFFFFD400, 16));
+        button.setOnClickListener(listener);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(42)
+        );
+        params.setMargins(dp(3), 0, dp(3), 0);
+        button.setLayoutParams(params);
+        return button;
+    }
+
+    private GradientDrawable roundedBackground(int color, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        return drawable;
+    }
+
+    private void pageZoom(float factor) {
+        try {
+            webView.zoomBy(factor);
+            Toast.makeText(this, factor > 1f ? "Ansicht vergrößert" : "Ansicht verkleinert", Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {
+        }
+        enterImmersiveMode();
+    }
+
+    private void changeFont(int delta) {
+        fontZoom = Math.max(80, Math.min(160, fontZoom + delta));
+        webView.getSettings().setTextZoom(fontZoom);
+        prefs.edit().putInt("fontZoom", fontZoom).apply();
+        Toast.makeText(this, "Schrift: " + fontZoom + "%", Toast.LENGTH_SHORT).show();
+        enterImmersiveMode();
+    }
+
+    private void cycleBackground() {
+        backgroundIndex = (backgroundIndex + 1) % BACKGROUNDS.length;
+        prefs.edit().putInt("backgroundIndex", backgroundIndex).apply();
+        applyPageEnhancements();
+        Toast.makeText(this, "Hintergrund: " + BACKGROUND_NAMES[backgroundIndex], Toast.LENGTH_SHORT).show();
+        enterImmersiveMode();
     }
 
     private void configureWebView() {
@@ -176,8 +292,10 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
-        settings.setBuiltInZoomControls(false);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(true);
         settings.setDisplayZoomControls(false);
+        settings.setTextZoom(fontZoom);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSupportMultipleWindows(false);
         settings.setAllowFileAccess(false);
@@ -199,6 +317,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
+                applyPageEnhancements();
                 enterImmersiveMode();
             }
 
@@ -237,6 +356,44 @@ public class MainActivity extends Activity {
                 }
             }
         });
+    }
+
+    private void applyPageEnhancements() {
+        String bg = BACKGROUNDS[backgroundIndex];
+        String css =
+                "html{-webkit-text-size-adjust:100%;width:100%!important;max-width:100%!important;overflow-x:hidden!important;}" +
+                "html,body{box-sizing:border-box!important;}" +
+                "body{width:100%!important;max-width:100%!important;margin:0 auto!important;padding:8px 10px 86px!important;overflow-x:hidden!important;background:" + bg + "!important;line-height:1.45!important;}" +
+                "*,*:before,*:after{box-sizing:border-box!important;}" +
+                "img{max-width:100%!important;height:auto!important;object-fit:contain!important;}" +
+                "table{max-width:100%!important;}" +
+                "iframe,video,object,embed{max-width:100%!important;height:auto!important;}" +
+                "input,select,textarea,button{max-width:100%!important;}" +
+                "p,li,td,th,a{overflow-wrap:anywhere;}" +
+                "@media screen and (max-width:700px){" +
+                "body{padding-left:8px!important;padding-right:8px!important;}" +
+                "table[width]{width:100%!important;max-width:100%!important;}" +
+                "td[width],div[style*='width']{max-width:100%!important;}" +
+                "img[width]{max-width:100%!important;height:auto!important;}" +
+                "}";
+
+        String js = "(function(){" +
+                "var h=document.head||document.getElementsByTagName('head')[0];" +
+                "if(!h){return;}" +
+                "var v=document.querySelector('meta[name=viewport]');" +
+                "if(!v){v=document.createElement('meta');v.name='viewport';h.appendChild(v);}" +
+                "v.content='width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes';" +
+                "var s=document.getElementById('ms-extra-mobile-style');" +
+                "if(!s){s=document.createElement('style');s.id='ms-extra-mobile-style';h.appendChild(s);}" +
+                "s.textContent=" + JSONObject.quote(css) + ";" +
+                "document.querySelectorAll('img').forEach(function(i){i.style.maxWidth='100%';i.style.height='auto';});" +
+                "document.querySelectorAll('table[width]').forEach(function(t){t.style.maxWidth='100%';t.style.width='100%';});" +
+                "})();";
+        webView.evaluateJavascript(js, null);
+        try {
+            webView.setBackgroundColor(Color.parseColor(bg));
+        } catch (Exception ignored) {
+        }
     }
 
     private boolean handleUri(Uri uri) {
@@ -278,7 +435,9 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
+        if (displayControls != null && displayControls.getVisibility() == View.VISIBLE) {
+            displayControls.setVisibility(View.GONE);
+        } else if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();
