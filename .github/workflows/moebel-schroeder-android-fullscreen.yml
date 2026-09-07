@@ -1,8 +1,8 @@
-name: Build Möbel Schröder Showroom #3 APK
+name: Build Möbel Schröder #4 APK
 
 on:
   push:
-    branches: [ moebel-schroeder-android-v3 ]
+    branches: [ moebel-schroeder-android-v4 ]
     paths:
       - 'android-fullscreen/**'
       - '.github/workflows/moebel-schroeder-android-fullscreen.yml'
@@ -34,10 +34,10 @@ jobs:
         run: gradle :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Moebel-Schroeder-Showroom-3.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Moebel-Schroeder-4.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Moebel-Schroeder-Showroom-3-APK
-          path: android-fullscreen/Moebel-Schroeder-Showroom-3.apk
+          name: Moebel-Schroeder-4-APK
+          path: android-fullscreen/Moebel-Schroeder-4.apk
