@@ -1,0 +1,40 @@
+name: Build Self App Builder APK
+
+on:
+  push:
+    paths:
+      - 'self-app-builder/**'
+      - '.github/workflows/build-self-app-builder.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle -p self-app-builder assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp self-app-builder/app/build/outputs/apk/debug/app-debug.apk Self-App-Builder.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Self-App-Builder-APK
+          path: Self-App-Builder.apk
+          if-no-files-found: error
+          retention-days: 30
