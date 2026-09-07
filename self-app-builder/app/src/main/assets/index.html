@@ -3,25 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Self App Builder</title>
+<title>Self App Builder IDE</title>
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#111827;color:#f9fafb} .wrap{padding:20px;max-width:720px;margin:auto} h1{font-size:28px;margin:8px 0 6px} p{color:#cbd5e1} .card{background:#1f2937;border-radius:18px;padding:18px;margin-top:18px;box-shadow:0 10px 30px #0004} label{display:block;margin:14px 0 6px;font-weight:700} input,select{width:100%;box-sizing:border-box;padding:13px;border-radius:12px;border:1px solid #374151;background:#0f172a;color:white;font-size:16px} .row{display:flex;gap:12px}.row>*{flex:1} button{width:100%;margin-top:20px;padding:15px;border:0;border-radius:14px;background:#fbbf24;color:#111827;font-weight:800;font-size:17px}.small{font-size:13px;color:#94a3b8;margin-top:12px}.badge{display:inline-block;background:#374151;padding:6px 10px;border-radius:999px;font-size:12px}</style>
+*{box-sizing:border-box}body{margin:0;background:#0b1220;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.top{position:sticky;top:0;z-index:10;background:#111827;padding:12px 14px;border-bottom:1px solid #263244}.title{font-weight:800;font-size:18px}.sub{font-size:12px;color:#94a3b8}.tabs,.actions{display:flex;gap:8px;padding:10px 12px;overflow:auto}.tabs button,.actions button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;white-space:nowrap}.tabs button{background:#1f2937;color:#cbd5e1}.tabs button.active{background:#fbbf24;color:#111827}.actions button{background:#2563eb;color:white}.actions .save{background:#059669}.actions .clear{background:#7f1d1d}.editor{padding:0 12px 12px}textarea{width:100%;height:42vh;resize:vertical;background:#020617;color:#e2e8f0;border:1px solid #334155;border-radius:12px;padding:14px;font:14px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none}.previewHead{padding:0 12px 8px;font-weight:800}.preview{margin:0 12px 14px;border:1px solid #334155;border-radius:12px;overflow:hidden;background:white;height:38vh}iframe{width:100%;height:100%;border:0;background:white}.status{padding:0 12px 14px;color:#94a3b8;font-size:12px}
+</style>
 </head>
-<body><div class="wrap">
-<span class="badge">SELF APP BUILDER v1</span>
-<h1>Android App Builder</h1>
-<p>Website oder Web-App konfigurieren und daraus ein Android-Projekt vorbereiten.</p>
-<div class="card">
-<label>App-Name</label><input id="name" value="Meine App">
-<label>Website-URL</label><input id="url" placeholder="https://example.com">
-<label>Paketname</label><input id="pkg" value="de.meine.app">
-<div class="row"><div><label>Min SDK</label><select id="min"><option>24</option><option>26</option><option>28</option></select></div><div><label>Target SDK</label><select id="target"><option>35</option></select></div></div>
-<label><input id="full" type="checkbox" checked style="width:auto"> Vollbild</label>
-<label><input id="js" type="checkbox" checked style="width:auto"> JavaScript aktiv</label>
-<button onclick="buildConfig()">Projekt-Konfiguration erzeugen</button>
-<div id="out" class="small">Noch keine Konfiguration erzeugt.</div>
-</div>
-</div>
+<body>
+<div class="top"><div class="title">Self App Builder IDE v3</div><div class="sub">HTML · CSS · JavaScript direkt auf Android schreiben und ausführen</div></div>
+<div class="tabs"><button id="tabHtml" class="active" onclick="showTab('html')">HTML</button><button id="tabCss" onclick="showTab('css')">CSS</button><button id="tabJs" onclick="showTab('js')">JavaScript</button></div>
+<div class="editor"><textarea id="code" spellcheck="false"></textarea></div>
+<div class="actions"><button onclick="runCode()">▶ AUSFÜHREN</button><button class="save" onclick="saveProject()">💾 SPEICHERN</button><button onclick="loadProject()">↻ LADEN</button><button class="clear" onclick="resetProject()">RESET</button></div>
+<div class="previewHead">Live-Vorschau</div><div class="preview"><iframe id="preview" sandbox="allow-scripts allow-forms allow-modals"></iframe></div>
+<div id="status" class="status">Bereit.</div>
 <script>
-function buildConfig(){const cfg={appName:name.value,url:url.value,packageName:pkg.value,minSdk:+min.value,targetSdk:+target.value,fullscreen:full.checked,javascript:js.checked};out.textContent=JSON.stringify(cfg,null,2);}
-</script></body></html>
+const defaults={html:`<main class="card">\n  <h1>Meine erste App</h1>\n  <p>Dieser Inhalt läuft direkt in der APK.</p>\n  <button onclick="hello()">Testen</button>\n</main>`,css:`body{font-family:system-ui;background:#eef2ff;margin:0;padding:24px}.card{max-width:520px;margin:auto;background:white;padding:24px;border-radius:20px;box-shadow:0 10px 30px #0002}button{padding:12px 16px;border:0;border-radius:10px;background:#2563eb;color:white;font-weight:700}`,js:`function hello(){\n  document.querySelector('p').textContent='JavaScript läuft wirklich ✔';\n}`};
+let project={...defaults};let current='html';const code=document.getElementById('code');
+function sync(){project[current]=code.value}
+function showTab(t){sync();current=t;code.value=project[t];document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));document.getElementById('tab'+t[0].toUpperCase()+t.slice(1)).classList.add('active')}
+function runCode(){sync();const doc=`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${project.css}</style></head><body>${project.html}<script>${project.js}<\/script></body></html>`;document.getElementById('preview').srcdoc=doc;status.textContent='Ausgeführt: '+new Date().toLocaleTimeString()}
+function saveProject(){sync();localStorage.setItem('selfbuilder.project',JSON.stringify(project));status.textContent='Projekt lokal gespeichert.'}
+function loadProject(){const s=localStorage.getItem('selfbuilder.project');if(s){project=JSON.parse(s);showTab(current);runCode();status.textContent='Projekt geladen.'}else status.textContent='Noch kein gespeichertes Projekt vorhanden.'}
+function resetProject(){project={...defaults};showTab('html');runCode();status.textContent='Projekt zurückgesetzt.'}
+code.value=project.html;runCode();
+</script>
+</body></html>
