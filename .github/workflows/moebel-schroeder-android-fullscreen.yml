@@ -1,4 +1,4 @@
-name: Build MoebelSchroeder #2 Fullscreen APK
+name: Build Extra Möbel Mobile APK
 
 on:
   push:
@@ -30,14 +30,14 @@ jobs:
         with:
           gradle-version: '9.6.0'
 
-      - name: Build fullscreen debug APK
+      - name: Build debug APK
         run: gradle :app:assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk MoebelSchroeder-2-Vollbild.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Extra-Moebel.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MoebelSchroeder-2-Vollbild-APK
-          path: android-fullscreen/MoebelSchroeder-2-Vollbild.apk
+          name: Extra-Moebel-Mobile-APK
+          path: android-fullscreen/Extra-Moebel.apk
