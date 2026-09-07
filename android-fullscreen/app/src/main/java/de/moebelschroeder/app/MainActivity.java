@@ -34,8 +34,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
-    private static final String BUNDLE_VERSION = "2026-09-07-v4";
+    private static final String BUNDLE_VERSION = "2026-09-07-v4.1";
     private static final String BUNDLE_NAME = "site_bundle.zip";
+    private static final int BLUE_DARK = 0xFF0B3C8C;
+    private static final int BLUE_MAIN = 0xFF1656A5;
+    private static final int BLUE_LIGHT = 0xFF2C6FC0;
+    private static final int WHITE = 0xFFFFFFFF;
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -48,7 +52,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = getSharedPreferences("app3", MODE_PRIVATE);
+        prefs = getSharedPreferences("app4", MODE_PRIVATE);
         imageFit = prefs.getBoolean("imageFit", false);
         siteDir = new File(getFilesDir(), "site");
 
@@ -139,10 +143,10 @@ public class MainActivity extends Activity {
 
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(255, 251, 234));
+        root.setBackgroundColor(0xFFF7F9FC);
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(255, 251, 234));
+        webView.setBackgroundColor(0xFFF7F9FC);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
 
@@ -158,11 +162,11 @@ public class MainActivity extends Activity {
         errorView.setOrientation(LinearLayout.VERTICAL);
         errorView.setGravity(Gravity.CENTER);
         errorView.setPadding(dp(28), dp(28), dp(28), dp(28));
-        errorView.setBackgroundColor(0xFFFFFBEA);
+        errorView.setBackgroundColor(0xFFF7F9FC);
         errorView.setVisibility(View.GONE);
         TextView errorText = new TextView(this);
         errorText.setText("Möbel Schröder\n\nDie Seite konnte gerade nicht geladen werden.");
-        errorText.setTextColor(0xFF0B3C8C);
+        errorText.setTextColor(BLUE_DARK);
         errorText.setTextSize(20);
         errorText.setGravity(Gravity.CENTER);
         errorView.addView(errorText);
@@ -175,7 +179,7 @@ public class MainActivity extends Activity {
         dockShell.setOrientation(LinearLayout.VERTICAL);
         dockShell.setGravity(Gravity.CENTER);
         dockShell.setPadding(dp(7), dp(7), dp(7), dp(7));
-        dockShell.setBackgroundColor(0xF20B3C8C);
+        dockShell.setBackgroundColor(BLUE_DARK);
         dockShell.setElevation(dp(12));
 
         submenu = new LinearLayout(this);
@@ -248,11 +252,11 @@ public class MainActivity extends Activity {
         b.setText(text);
         b.setAllCaps(false);
         b.setTextSize(strong ? 13 : 12);
-        b.setTextColor(0xFF082F70);
+        b.setTextColor(WHITE);
         b.setPadding(dp(5), 0, dp(5), 0);
         b.setMinHeight(dp(44));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            b.setBackgroundTintList(ColorStateList.valueOf(strong ? 0xFFFFD400 : 0xFFFFF2A8));
+            b.setBackgroundTintList(ColorStateList.valueOf(strong ? BLUE_MAIN : BLUE_LIGHT));
         return b;
     }
 
@@ -286,19 +290,16 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return handleUri(request.getUrl());
             }
-
             @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 errorView.setVisibility(View.GONE);
                 view.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.VISIBLE);
             }
-
             @Override public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
                 applyImageMode();
                 enterImmersive();
             }
-
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) showError("Die Seite konnte gerade nicht geladen werden.");
             }
