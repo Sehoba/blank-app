@@ -34,26 +34,20 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
-    private static final String BUNDLE_VERSION = "2026-09-07-v4.1";
+    private static final String BUNDLE_VERSION = "2026-09-07-v4.2-no-bottom-nav";
     private static final String BUNDLE_NAME = "site_bundle.zip";
     private static final int BLUE_DARK = 0xFF0B3C8C;
-    private static final int BLUE_MAIN = 0xFF1656A5;
-    private static final int BLUE_LIGHT = 0xFF2C6FC0;
-    private static final int WHITE = 0xFFFFFFFF;
 
     private WebView webView;
     private ProgressBar progressBar;
     private LinearLayout errorView;
-    private LinearLayout submenu;
     private SharedPreferences prefs;
     private File siteDir;
-    private boolean imageFit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("app4", MODE_PRIVATE);
-        imageFit = prefs.getBoolean("imageFit", false);
         siteDir = new File(getFilesDir(), "site");
 
         prepareFullscreen();
@@ -64,7 +58,8 @@ public class MainActivity extends Activity {
         try {
             ensureSiteBundle();
             String localUrl = Uri.fromFile(new File(siteDir, "index.html")).toString();
-            if (savedInstanceState == null) webView.loadUrl(localUrl); else webView.restoreState(savedInstanceState);
+            if (savedInstanceState == null) webView.loadUrl(localUrl);
+            else webView.restoreState(savedInstanceState);
         } catch (Exception e) {
             showError("App-Inhalt konnte nicht vorbereitet werden.");
         }
@@ -86,6 +81,7 @@ public class MainActivity extends Activity {
                 File out = new File(siteDir, entry.getName());
                 String root = siteDir.getCanonicalPath() + File.separator;
                 if (!out.getCanonicalPath().startsWith(root)) throw new SecurityException("Invalid zip path");
+
                 if (entry.isDirectory()) {
                     if (!out.mkdirs() && !out.exists()) throw new IllegalStateException("mkdir");
                 } else {
@@ -135,9 +131,12 @@ public class MainActivity extends Activity {
             }
         } else {
             getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN |
-                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+                    View.SYSTEM_UI_FLAG_FULLSCREEN |
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
     }
 
@@ -148,13 +147,16 @@ public class MainActivity extends Activity {
         webView = new WebView(this);
         webView.setBackgroundColor(0xFFF7F9FC);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(100);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             progressBar.setProgressTintList(ColorStateList.valueOf(0xFFFFD400));
-        FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(-1, dp(3));
+        FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(3));
         progressParams.gravity = Gravity.TOP;
         root.addView(progressBar, progressParams);
 
@@ -164,100 +166,28 @@ public class MainActivity extends Activity {
         errorView.setPadding(dp(28), dp(28), dp(28), dp(28));
         errorView.setBackgroundColor(0xFFF7F9FC);
         errorView.setVisibility(View.GONE);
+
         TextView errorText = new TextView(this);
         errorText.setText("Möbel Schröder\n\nDie Seite konnte gerade nicht geladen werden.");
         errorText.setTextColor(BLUE_DARK);
         errorText.setTextSize(20);
         errorText.setGravity(Gravity.CENTER);
         errorView.addView(errorText);
-        Button retry = navButton("Neu laden", true);
+
+        Button retry = new Button(this);
+        retry.setText("Neu laden");
+        retry.setAllCaps(false);
+        retry.setTextColor(Color.WHITE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            retry.setBackgroundTintList(ColorStateList.valueOf(BLUE_DARK));
         retry.setOnClickListener(v -> reloadPage());
         errorView.addView(retry);
-        root.addView(errorView, new FrameLayout.LayoutParams(-1, -1));
 
-        LinearLayout dockShell = new LinearLayout(this);
-        dockShell.setOrientation(LinearLayout.VERTICAL);
-        dockShell.setGravity(Gravity.CENTER);
-        dockShell.setPadding(dp(7), dp(7), dp(7), dp(7));
-        dockShell.setBackgroundColor(BLUE_DARK);
-        dockShell.setElevation(dp(12));
+        root.addView(errorView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
 
-        submenu = new LinearLayout(this);
-        submenu.setOrientation(LinearLayout.VERTICAL);
-        submenu.setVisibility(View.GONE);
-        submenu.setPadding(0, 0, 0, dp(6));
-
-        LinearLayout subRow1 = row();
-        addSubButton(subRow1, "Sortiment", "sortiment");
-        addSubButton(subRow1, "Beratung", "beratung");
-        addSubButton(subRow1, "Über uns", "unternehmen");
-        submenu.addView(subRow1);
-
-        LinearLayout subRow2 = row();
-        addSubButton(subRow2, "Kontakt", "kontakt");
-        Button image = navButton("Bilder", false);
-        image.setOnClickListener(v -> toggleImageMode());
-        subRow2.addView(image, weighted());
-        Button reload = navButton("Neu laden", false);
-        reload.setOnClickListener(v -> reloadPage());
-        subRow2.addView(reload, weighted());
-        submenu.addView(subRow2);
-        dockShell.addView(submenu);
-
-        LinearLayout primary = row();
-        Button back = navButton("← Zurück", true);
-        back.setOnClickListener(v -> { if (webView.canGoBack()) webView.goBack(); else scrollTo("top"); });
-        primary.addView(back, weighted());
-
-        Button home = navButton("⌂ Start", true);
-        home.setOnClickListener(v -> scrollTo("top"));
-        primary.addView(home, weighted());
-
-        Button menu = navButton("☰ Menü", true);
-        menu.setOnClickListener(v -> {
-            submenu.setVisibility(submenu.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
-            enterImmersive();
-        });
-        primary.addView(menu, weighted());
-        dockShell.addView(primary);
-
-        FrameLayout.LayoutParams dockParams = new FrameLayout.LayoutParams(-1, -2);
-        dockParams.gravity = Gravity.BOTTOM;
-        dockParams.setMargins(dp(8), 0, dp(8), dp(8));
-        root.addView(dockShell, dockParams);
         setContentView(root);
-    }
-
-    private LinearLayout row() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        return row;
-    }
-
-    private LinearLayout.LayoutParams weighted() {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(46), 1f);
-        p.setMargins(dp(2), dp(2), dp(2), dp(2));
-        return p;
-    }
-
-    private void addSubButton(LinearLayout row, String label, String section) {
-        Button b = navButton(label, false);
-        b.setOnClickListener(v -> { scrollTo(section); submenu.setVisibility(View.GONE); });
-        row.addView(b, weighted());
-    }
-
-    private Button navButton(String text, boolean strong) {
-        Button b = new Button(this);
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setTextSize(strong ? 13 : 12);
-        b.setTextColor(WHITE);
-        b.setPadding(dp(5), 0, dp(5), 0);
-        b.setMinHeight(dp(44));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            b.setBackgroundTintList(ColorStateList.valueOf(strong ? BLUE_MAIN : BLUE_LIGHT));
-        return b;
     }
 
     private void configureWebView() {
@@ -280,27 +210,34 @@ public class MainActivity extends Activity {
         }
 
         webView.setWebChromeClient(new android.webkit.WebChromeClient() {
-            @Override public void onProgressChanged(WebView view, int progress) {
+            @Override
+            public void onProgressChanged(WebView view, int progress) {
                 progressBar.setProgress(progress);
                 progressBar.setVisibility(progress >= 100 ? View.GONE : View.VISIBLE);
             }
         });
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return handleUri(request.getUrl());
             }
-            @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 errorView.setVisibility(View.GONE);
                 view.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.VISIBLE);
             }
-            @Override public void onPageFinished(WebView view, String url) {
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
-                applyImageMode();
                 enterImmersive();
             }
-            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) showError("Die Seite konnte gerade nicht geladen werden.");
             }
         });
@@ -317,24 +254,6 @@ public class MainActivity extends Activity {
         return true;
     }
 
-    private void toggleImageMode() {
-        imageFit = !imageFit;
-        prefs.edit().putBoolean("imageFit", imageFit).apply();
-        applyImageMode();
-        Toast.makeText(this, imageFit ? "Bilder vollständig eingepasst" : "Bilder wieder großflächig", Toast.LENGTH_SHORT).show();
-    }
-
-    private void applyImageMode() {
-        String js = "document.documentElement.classList." + (imageFit ? "add" : "remove") + "('app-image-fit');";
-        webView.evaluateJavascript(js, null);
-    }
-
-    private void scrollTo(String id) {
-        String safe = id.replace("'", "");
-        webView.evaluateJavascript("(function(){var e=document.getElementById('" + safe + "');if(e)e.scrollIntoView({behavior:'smooth',block:'start'});})();", null);
-        enterImmersive();
-    }
-
     private void reloadPage() {
         errorView.setVisibility(View.GONE);
         webView.setVisibility(View.VISIBLE);
@@ -349,9 +268,31 @@ public class MainActivity extends Activity {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
-    @Override protected void onResume() { super.onResume(); getWindow().getDecorView().post(this::enterImmersive); }
-    @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if (hasFocus) getWindow().getDecorView().postDelayed(this::enterImmersive, 100); }
-    @Override protected void onSaveInstanceState(Bundle out) { if (webView != null) webView.saveState(out); super.onSaveInstanceState(out); }
-    @Override public void onBackPressed() { if (submenu != null && submenu.getVisibility() == View.VISIBLE) { submenu.setVisibility(View.GONE); return; } if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed(); }
-    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        getWindow().getDecorView().post(this::enterImmersive);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) getWindow().getDecorView().postDelayed(this::enterImmersive, 100);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle out) {
+        if (webView != null) webView.saveState(out);
+        super.onSaveInstanceState(out);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
 }
