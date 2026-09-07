@@ -1,47 +1,38 @@
-package de.moebelschroeder.app;
+package de.moebelschroeder.app2;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
-import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    private static final String HOME_URL = "https://moebel-schroeder.net/index.html/";
-    private static final int FILE_CHOOSER_REQUEST = 1001;
+    private static final String HOME_URL = "https://id-preview--bafaf3a0-b26d-4fec-bd68-dbb7a5fd6e1d.lovable.app/";
+    private static final String INTERNAL_HOST = "id-preview--bafaf3a0-b26d-4fec-bd68-dbb7a5fd6e1d.lovable.app";
 
     private WebView webView;
     private ProgressBar progressBar;
-    private LinearLayout errorView;
-    private ValueCallback<Uri[]> fileCallback;
+    private TextView errorView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prepareFullscreenWindow();
+        prepareFullscreen();
         buildUi();
         configureWebView();
         enterImmersiveMode();
@@ -53,7 +44,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void prepareFullscreenWindow() {
+    private void prepareFullscreen() {
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
 
@@ -61,13 +52,13 @@ public class MainActivity extends Activity {
             getWindow().setDecorFitsSystemWindows(false);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            getWindow().setNavigationBarContrastEnforced(false);
             getWindow().setStatusBarContrastEnforced(false);
+            getWindow().setNavigationBarContrastEnforced(false);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            WindowManager.LayoutParams attributes = getWindow().getAttributes();
-            attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            getWindow().setAttributes(attributes);
+            WindowManager.LayoutParams params = getWindow().getAttributes();
+            params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(params);
         }
     }
 
@@ -90,20 +81,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        getWindow().getDecorView().post(this::enterImmersiveMode);
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            getWindow().getDecorView().postDelayed(this::enterImmersiveMode, 120);
-        }
-    }
-
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.WHITE);
@@ -120,47 +97,18 @@ public class MainActivity extends Activity {
         progressBar.setMax(100);
         FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(3)
+                6
         );
-        progressParams.gravity = Gravity.TOP;
         root.addView(progressBar, progressParams);
 
-        errorView = new LinearLayout(this);
-        errorView.setOrientation(LinearLayout.VERTICAL);
-        errorView.setGravity(Gravity.CENTER);
-        errorView.setPadding(dp(28), dp(28), dp(28), dp(28));
+        errorView = new TextView(this);
+        errorView.setText("Möbelschröder #2 konnte nicht geladen werden.\n\nInternetverbindung prüfen und App erneut öffnen.");
+        errorView.setTextSize(18);
+        errorView.setTextColor(0xFF333333);
+        errorView.setGravity(android.view.Gravity.CENTER);
+        errorView.setPadding(48, 48, 48, 48);
         errorView.setBackgroundColor(Color.WHITE);
         errorView.setVisibility(View.GONE);
-
-        TextView title = new TextView(this);
-        title.setText("Keine Verbindung");
-        title.setTextSize(22);
-        title.setTextColor(0xFF222222);
-        title.setGravity(Gravity.CENTER);
-        errorView.addView(title);
-
-        TextView hint = new TextView(this);
-        hint.setText("Die Möbelschröder-Webseite konnte gerade nicht geladen werden.");
-        hint.setTextSize(15);
-        hint.setTextColor(0xFF666666);
-        hint.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        hintParams.setMargins(0, dp(12), 0, dp(20));
-        errorView.addView(hint, hintParams);
-
-        Button retry = new Button(this);
-        retry.setText("Erneut versuchen");
-        retry.setOnClickListener(v -> {
-            errorView.setVisibility(View.GONE);
-            webView.setVisibility(View.VISIBLE);
-            webView.reload();
-            enterImmersiveMode();
-        });
-        errorView.addView(retry);
-
         root.addView(errorView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -183,16 +131,37 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(true);
 
+        webView.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override
+            public void onProgressChanged(WebView view, int newProgress) {
+                progressBar.setProgress(newProgress);
+                progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+            }
+        });
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handleUri(request.getUrl());
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+                String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+
+                if ((scheme.equals("http") || scheme.equals("https"))
+                        && (host.equals(INTERNAL_HOST) || host.endsWith(".lovable.app"))) {
+                    return false;
+                }
+
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                } catch (Exception ignored) {
+                }
+                return true;
             }
 
             @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 errorView.setVisibility(View.GONE);
-                view.setVisibility(View.VISIBLE);
+                webView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.VISIBLE);
             }
 
@@ -205,69 +174,26 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    view.setVisibility(View.GONE);
                     progressBar.setVisibility(View.GONE);
+                    webView.setVisibility(View.GONE);
                     errorView.setVisibility(View.VISIBLE);
                 }
             }
         });
-
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onProgressChanged(WebView view, int newProgress) {
-                progressBar.setProgress(newProgress);
-                progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-            }
-
-            @Override
-            public boolean onShowFileChooser(
-                    WebView webView,
-                    ValueCallback<Uri[]> filePathCallback,
-                    FileChooserParams fileChooserParams
-            ) {
-                if (fileCallback != null) fileCallback.onReceiveValue(null);
-                fileCallback = filePathCallback;
-                try {
-                    startActivityForResult(fileChooserParams.createIntent(), FILE_CHOOSER_REQUEST);
-                    return true;
-                } catch (ActivityNotFoundException ex) {
-                    fileCallback = null;
-                    Toast.makeText(MainActivity.this, "Keine App zur Dateiauswahl gefunden.", Toast.LENGTH_SHORT).show();
-                    return false;
-                }
-            }
-        });
-    }
-
-    private boolean handleUri(Uri uri) {
-        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-
-        if ((scheme.equals("http") || scheme.equals("https")) && isInternalHost(host)) {
-            return false;
-        }
-
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, uri));
-        } catch (Exception ex) {
-            Toast.makeText(this, "Link konnte nicht geöffnet werden.", Toast.LENGTH_SHORT).show();
-        }
-        return true;
-    }
-
-    private boolean isInternalHost(String host) {
-        return host.equals("moebel-schroeder.net") || host.equals("www.moebel-schroeder.net");
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == FILE_CHOOSER_REQUEST && fileCallback != null) {
-            Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
-            fileCallback.onReceiveValue(result);
-            fileCallback = null;
+    protected void onResume() {
+        super.onResume();
+        getWindow().getDecorView().post(this::enterImmersiveMode);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            getWindow().getDecorView().postDelayed(this::enterImmersiveMode, 120);
         }
-        getWindow().getDecorView().postDelayed(this::enterImmersiveMode, 150);
     }
 
     @Override
@@ -283,10 +209,5 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
-    }
-
-    private int dp(int value) {
-        float density = getResources().getDisplayMetrics().density;
-        return Math.round(value * density);
     }
 }
