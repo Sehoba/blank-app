@@ -9,7 +9,7 @@ on:
     branches: [main]
     paths:
       - 'gorilla-fia/**'
-      - '.github/workflows/gorilla-fia-level2.yml'
+      - '.github/workflows/build-gorilla-fia-level2.yml'
   workflow_dispatch:
 
 jobs:
@@ -46,8 +46,8 @@ jobs:
       - name: Apply Android app identity and fullscreen
         working-directory: gorilla-fia
         run: |
-          sed -i 's/versionCode 1/versionCode 2/' android/app/build.gradle
-          sed -i 's/versionName "1.0"/versionName "2.0"/' android/app/build.gradle
+          sed -i 's/versionCode 1/versionCode 3/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "3.0"/' android/app/build.gradle
           mkdir -p android/app/src/main/res/drawable
           base64 -d app_icon.b64 > android/app/src/main/res/drawable/gorilla_fia_icon.png
           python3 - <<'PY'
@@ -97,11 +97,11 @@ jobs:
       - name: Upload APK
         run: |
           mkdir -p apk-out
-          cp gorilla-fia/android/app/build/outputs/apk/debug/app-debug.apk 'apk-out/Gorilla-Fia-v2-Level2-RPG.apk'
+          cp gorilla-fia/android/app/build/outputs/apk/debug/app-debug.apk 'apk-out/Gorilla-Fia-v3-CoreStyle.apk'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Gorilla-Fia-v2-Level2-RPG-APK
-          path: apk-out/Gorilla-Fia-v2-Level2-RPG.apk
+          name: Gorilla-Fia-v3-CoreStyle-APK
+          path: apk-out/Gorilla-Fia-v3-CoreStyle.apk
           if-no-files-found: error
           retention-days: 30
