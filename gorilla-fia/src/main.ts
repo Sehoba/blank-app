@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import './style.css';
+import './pixel-theme.css';
 import { GameScene } from './game/GameScene';
 import { Level2Scene } from './game/Level2Scene';
 import { installVisualStyle } from './game/VisualStyle';
