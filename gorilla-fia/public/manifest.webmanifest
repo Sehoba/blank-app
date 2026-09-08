@@ -1,0 +1,13 @@
+{
+  "name": "Gorilla & Fia: Die Dschungelkrone",
+  "short_name": "Gorilla & Fia",
+  "description": "Pixel-Action-Abenteuer mit RPG-Fortschritt, Eischuss und zwei großen Levels.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#07140d",
+  "theme_color": "#07140d",
+  "categories": ["games"],
+  "icons": []
+}
