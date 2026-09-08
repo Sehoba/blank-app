@@ -1,826 +1,546 @@
 package com.aistudio.selfappbuilder
 
-import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.Bundle
-import android.webkit.ConsoleMessage
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DarkColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.WindowCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.util.Locale
+import java.util.UUID
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+private const val DEFAULT_PROFILE = "https://www.tiktok.com/@astralwesennummerdrei?_r=1&_t=ZG-99YyjTnhbXs"
+private const val PREFS = "tiktok_agent"
+private const val PREF_VIDEOS = "videos"
+
+data class VideoItem(
+    val id: String,
+    val source: String,
+    val url: String,
+    val title: String,
+    val author: String,
+    val durationSec: Double,
+    val width: Int,
+    val height: Int,
+    val openingEnergy: Int,
+    val hashtags: List<String>
+)
+
+data class OEmbedMeta(
+    val title: String,
+    val author: String,
+    val authorUrl: String,
+    val type: String,
+    val thumbnail: String
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    background = Color(0xFF070D18),
-                    surface = Color(0xFF0F172A),
-                    primary = Color(0xFF10B981),
-                    secondary = Color(0xFFF59E0B),
-                    surfaceVariant = Color(0xFF1E293B)
-                )
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    SelfAppBuilderScreen(this)
-                }
+            TikTokAgentTheme {
+                TikTokAgentScreen()
             }
         }
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SelfAppBuilderScreen(context: Context) {
-    val defaultProject = remember { GameTemplates.getGorillaFiaGame() }
+private fun TikTokAgentTheme(content: @Composable () -> Unit) {
+    val scheme: DarkColorScheme = darkColorScheme()
+    MaterialTheme(colorScheme = scheme, content = content)
+}
 
-    var currentTab by remember { mutableStateOf("HTML") }
-    var htmlCode by remember { mutableStateOf(defaultProject.html) }
-    var cssCode by remember { mutableStateOf(defaultProject.css) }
-    var jsCode by remember { mutableStateOf(defaultProject.js) }
+@Composable
+private fun TikTokAgentScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val videos = remember { mutableStateListOf<VideoItem>() }
 
-    var previewHtml by remember { mutableStateOf("") }
-    var statusMessage by remember { mutableStateOf("Bereit. Gorilla & Fia Dschungelspiel geladen.") }
-
-    var showGameCreatorDialog by remember { mutableStateOf(false) }
-    var showFullscreenGame by remember { mutableStateOf(false) }
-    var showProjectsDialog by remember { mutableStateOf(false) }
-    var showSaveDialog by remember { mutableStateOf(false) }
-    var projectSaveName by remember { mutableStateOf("Gorilla & Fia") }
-
-    val sharedPreferences = remember {
-        context.getSharedPreferences("selfbuilder_projects", Context.MODE_PRIVATE)
-    }
-
-    fun buildFullDoc(): String {
-        return "<!doctype html><html><head>" +
-                "<meta charset=\"utf-8\">" +
-                "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no\">" +
-                "<style>${cssCode}</style>" +
-                "</head><body>${htmlCode}" +
-                "<script>${jsCode}</script>" +
-                "</body></html>"
-    }
-
-    fun runCode() {
-        previewHtml = buildFullDoc()
-        val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-        statusMessage = "Ausgeführt um $time Uhr."
-    }
+    var profileUrl by rememberSaveable { mutableStateOf(DEFAULT_PROFILE) }
+    var videoUrl by rememberSaveable { mutableStateOf("") }
+    var profileInfo by remember { mutableStateOf("Profil noch nicht geprüft.") }
+    var status by remember { mutableStateOf("Bereit.") }
 
     LaunchedEffect(Unit) {
-        runCode()
+        videos.clear()
+        videos.addAll(loadVideos(context))
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-    ) {
-        // App Top Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0F172A))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Self App Builder",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        color = Color(0xFF10B981).copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "IDE v3",
-                            color = Color(0xFF34D399),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+    val importVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                status = "Lokales Video wird analysiert …"
+                try {
+                    try {
+                        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) {
                     }
-                }
-                Text(
-                    text = "HTML · CSS · JavaScript & Game Studio",
-                    color = Color(0xFF94A3B8),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp
-                )
-            }
-
-            // High-priority Game Creator Button
-            Button(
-                onClick = { showGameCreatorDialog = true },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE11D48),
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                modifier = Modifier.testTag("btn_create_game")
-            ) {
-                Text(
-                    text = "🎮 Spiel erstellen",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-        }
-
-        // Action Toolbar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .background(Color(0xFF0A1120))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(
-                onClick = { runCode() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("btn_run")
-            ) {
-                Text("▶ " + stringResource(R.string.action_run))
-            }
-
-            Button(
-                onClick = {
-                    runCode()
-                    showFullscreenGame = true
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("btn_fullscreen")
-            ) {
-                Text("📱 " + stringResource(R.string.action_fullscreen))
-            }
-
-            Button(
-                onClick = { showSaveDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("btn_save")
-            ) {
-                Text("💾 " + stringResource(R.string.action_save))
-            }
-
-            Button(
-                onClick = { showProjectsDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("btn_projects")
-            ) {
-                Text("📁 " + stringResource(R.string.action_load))
-            }
-
-            Button(
-                onClick = {
-                    val p = GameTemplates.getGorillaFiaGame()
-                    htmlCode = p.html
-                    cssCode = p.css
-                    jsCode = p.js
-                    currentTab = "HTML"
-                    runCode()
-                    statusMessage = "Auf Vorlage zurückgesetzt."
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7F1D1D)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("btn_reset")
-            ) {
-                Text("↺ " + stringResource(R.string.action_reset))
-            }
-        }
-
-        // Code Tabs
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0F172A))
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf("HTML", "CSS", "JS").forEach { tab ->
-                val isSelected = currentTab == tab
-                Surface(
-                    color = if (isSelected) Color(0xFFFBBF24) else Color(0xFF1E293B),
-                    contentColor = if (isSelected) Color.Black else Color(0xFFCBD5E1),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .clickable { currentTab = tab }
-                        .testTag("tab_${tab.lowercase()}")
-                ) {
-                    Text(
-                        text = when (tab) {
-                            "HTML" -> "HTML 📄"
-                            "CSS" -> "CSS 🎨"
-                            else -> "JavaScript ⚡"
-                        },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                    )
-                }
-            }
-        }
-
-        // Code Editor Box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF020617))
-        ) {
-            val currentCode = when (currentTab) {
-                "HTML" -> htmlCode
-                "CSS" -> cssCode
-                else -> jsCode
-            }
-            BasicTextField(
-                value = currentCode,
-                onValueChange = {
-                    when (currentTab) {
-                        "HTML" -> htmlCode = it
-                        "CSS" -> cssCode = it
-                        "JS" -> jsCode = it
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(10.dp)
-                    .testTag("code_editor"),
-                textStyle = TextStyle(
-                    color = Color(0xFFE2E8F0),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-            )
-        }
-
-        // Live Preview Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Live-Vorschau & Spiel",
-                color = Color(0xFFF8FAFC),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Tippen zum Steuern",
-                color = Color(0xFF64748B),
-                fontSize = 11.sp
-            )
-        }
-
-        // Embedded Preview WebView
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 10.dp, vertical = 2.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF000000))
-        ) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.databaseEnabled = true
-                        settings.useWideViewPort = true
-                        settings.loadWithOverviewMode = true
-                        webViewClient = WebViewClient()
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                                consoleMessage?.let {
-                                    if (it.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
-                                        statusMessage = "⚠️ JS Fehler: ${it.message()}"
-                                    }
-                                }
-                                return super.onConsoleMessage(consoleMessage)
-                            }
-                        }
-                    }
-                },
-                update = { webView ->
-                    webView.loadDataWithBaseURL("https://localapp/", previewHtml, "text/html", "UTF-8", null)
-                }
-            )
-        }
-
-        // Bottom Status Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0B1220))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF10B981))
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = statusMessage,
-                color = Color(0xFF94A3B8),
-                fontSize = 11.sp,
-                maxLines = 1
-            )
-        }
-    }
-
-    // --- GAME CREATOR MODAL DIALOG ---
-    if (showGameCreatorDialog) {
-        Dialog(
-            onDismissRequest = { showGameCreatorDialog = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .wrapContentHeight()
-                    .clip(RoundedCornerShape(20.dp)),
-                color = Color(0xFF0F172A)
-            ) {
-                var selectedTab by remember { mutableStateOf(0) } // 0 = Vorlagen, 1 = Baukasten
-
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "🎮 Spiel erstellen",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "✕",
-                            color = Color.Gray,
-                            fontSize = 20.sp,
-                            modifier = Modifier
-                                .clickable { showGameCreatorDialog = false }
-                                .padding(4.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    TabRow(
-                        selectedTabIndex = selectedTab,
-                        containerColor = Color(0xFF1E293B),
-                        contentColor = Color(0xFFFBBF24)
-                    ) {
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            text = { Text("Beliebte Spiele", fontWeight = FontWeight.Bold) }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            text = { Text("Spiel-Baukasten", fontWeight = FontWeight.Bold) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    if (selectedTab == 0) {
-                        // Preset Games List
-                        val games = listOf(
-                            GameTemplates.getGorillaFiaGame(),
-                            GameTemplates.getFlappyFiaGame(),
-                            GameTemplates.getSnakeGame(),
-                            GameTemplates.getSpaceShooterGame()
-                        )
-
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.heightIn(max = 380.dp)
-                        ) {
-                            items(games) { game ->
-                                Surface(
-                                    color = Color(0xFF1E293B),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            htmlCode = game.html
-                                            cssCode = game.css
-                                            jsCode = game.js
-                                            currentTab = "HTML"
-                                            runCode()
-                                            statusMessage = "Spiel '${game.title}' geladen!"
-                                            showGameCreatorDialog = false
-                                        }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(game.icon, fontSize = 32.sp)
-                                        Spacer(modifier = Modifier.width(14.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = game.title,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp
-                                            )
-                                            Text(
-                                                text = game.description,
-                                                color = Color(0xFF94A3B8),
-                                                fontSize = 12.sp,
-                                                lineHeight = 15.sp
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Button(
-                                            onClick = {
-                                                htmlCode = game.html
-                                                cssCode = game.css
-                                                jsCode = game.js
-                                                currentTab = "HTML"
-                                                runCode()
-                                                statusMessage = "Spiel '${game.title}' geladen!"
-                                                showGameCreatorDialog = false
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                                        ) {
-                                            Text("Laden", fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Custom Game Wizard / Baukasten
-                        var speedSlider by remember { mutableFloatStateOf(1.0f) }
-                        var jumpSlider by remember { mutableFloatStateOf(1.0f) }
-                        var soundToggle by remember { mutableStateOf(true) }
-
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
-                            modifier = Modifier.padding(vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "Konfiguriere dein Gorilla & Fia Spiel:",
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 13.sp
-                            )
-
-                            // Speed Slider
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Lauf-Tempo:", color = Color.White, fontSize = 13.sp)
-                                    Text("${(speedSlider * 100).toInt()}%", color = Color(0xFF34D399), fontWeight = FontWeight.Bold)
-                                }
-                                Slider(
-                                    value = speedSlider,
-                                    onValueChange = { speedSlider = it },
-                                    valueRange = 0.6f..1.8f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color(0xFF10B981),
-                                        activeTrackColor = Color(0xFF10B981)
-                                    )
-                                )
-                            }
-
-                            // Jump Power Slider
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Sprungkraft:", color = Color.White, fontSize = 13.sp)
-                                    Text("${(jumpPowerMultiplier(jumpSlider)).toInt()}%", color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
-                                }
-                                Slider(
-                                    value = jumpSlider,
-                                    onValueChange = { jumpSlider = it },
-                                    valueRange = 0.7f..1.6f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color(0xFFFBBF24),
-                                        activeTrackColor = Color(0xFFFBBF24)
-                                    )
-                                )
-                            }
-
-                            // Sound toggle
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Web Audio Sound-Effekte", color = Color.White, fontSize = 13.sp)
-                                Switch(
-                                    checked = soundToggle,
-                                    onCheckedChange = { soundToggle = it }
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Button(
-                                onClick = {
-                                    val customGame = GameTemplates.getGorillaFiaGame(
-                                        speedMultiplier = speedSlider,
-                                        jumpPowerMultiplier = jumpSlider,
-                                        soundEnabled = soundToggle
-                                    )
-                                    htmlCode = customGame.html
-                                    cssCode = customGame.css
-                                    jsCode = customGame.js
-                                    currentTab = "HTML"
-                                    runCode()
-                                    statusMessage = "Individuelles Gorilla & Fia Spiel generiert!"
-                                    showGameCreatorDialog = false
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text(
-                                    "🚀 Spiel jetzt generieren & einfügen",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
+                    val item = withContext(Dispatchers.IO) { analyzeLocalVideo(context, uri) }
+                    videos.add(0, item)
+                    saveVideos(context, videos)
+                    status = "Lokales Video analysiert: ${item.durationSec.format1()} s, Opening-Energie ${item.openingEnergy}/100."
+                } catch (e: Exception) {
+                    status = "Videoanalyse fehlgeschlagen: ${e.message ?: "unbekannter Fehler"}"
                 }
             }
         }
     }
 
-    // --- FULLSCREEN GAME DIALOG ---
-    if (showFullscreenGame) {
-        Dialog(
-            onDismissRequest = { showFullscreenGame = false },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
-            )
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            ) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.mediaPlaybackRequiresUserGesture = false
-                            settings.databaseEnabled = true
-                            settings.useWideViewPort = true
-                            settings.loadWithOverviewMode = true
-                            webViewClient = WebViewClient()
-                            webChromeClient = WebChromeClient()
-                        }
-                    },
-                    update = { webView ->
-                        webView.loadDataWithBaseURL("https://localapp/", buildFullDoc(), "text/html", "UTF-8", null)
-                    }
-                )
-
-                // Top Floating Exit Control
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.7f),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = "🎮 VOLLBILD SPIELMODUS",
-                            color = Color(0xFFFBBF24),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                    }
-
-                    Button(
-                        onClick = { showFullscreenGame = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text("✕ Beenden", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-            }
+    val jsonExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri != null) {
+            runCatching { writeText(context, uri, videosToJson(videos).toString(2)) }
+                .onSuccess { status = "JSON exportiert." }
+                .onFailure { status = "JSON-Export fehlgeschlagen: ${it.message}" }
         }
     }
 
-    // --- SAVE PROJECT DIALOG ---
-    if (showSaveDialog) {
-        AlertDialog(
-            onDismissRequest = { showSaveDialog = false },
-            title = { Text("Projekt / Spiel speichern") },
-            text = {
-                Column {
-                    Text("Gib deinem Spiel einen Namen:", color = Color.Gray, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
+    val csvExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri: Uri? ->
+        if (uri != null) {
+            runCatching { writeText(context, uri, videosToCsv(videos)) }
+                .onSuccess { status = "CSV exportiert." }
+                .onFailure { status = "CSV-Export fehlgeschlagen: ${it.message}" }
+        }
+    }
+
+    Surface(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Text("TikTok Video Analyse Agent", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("Öffentliche Links + lokale Videoanalyse · Android 15", style = MaterialTheme.typography.bodyMedium)
+            }
+
+            item {
+                SectionCard("Startprojekt · @astralwesennummerdrei") {
                     OutlinedTextField(
-                        value = projectSaveName,
-                        onValueChange = { projectSaveName = it },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        value = profileUrl,
+                        onValueChange = { profileUrl = it },
+                        label = { Text("TikTok-Profil-Link") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
                     )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val key = "project_${projectSaveName.trim().ifEmpty { "Unbenannt" }}"
-                        val jsonObj = JSONObject().apply {
-                            put("name", projectSaveName)
-                            put("html", htmlCode)
-                            put("css", cssCode)
-                            put("js", jsCode)
-                            put("savedAt", System.currentTimeMillis())
-                        }
-                        sharedPreferences.edit().putString(key, jsonObj.toString()).apply()
-
-                        // Add to list
-                        val listStr = sharedPreferences.getString("all_project_keys", "[]") ?: "[]"
-                        val jsonArr = JSONArray(listStr)
-                        var exists = false
-                        for (i in 0 until jsonArr.length()) {
-                            if (jsonArr.getString(i) == key) exists = true
-                        }
-                        if (!exists) {
-                            jsonArr.put(key)
-                            sharedPreferences.edit().putString("all_project_keys", jsonArr.toString()).apply()
-                        }
-
-                        statusMessage = "Spiel '$projectSaveName' gespeichert!"
-                        showSaveDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-                ) {
-                    Text("Speichern")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSaveDialog = false }) {
-                    Text("Abbrechen")
-                }
-            }
-        )
-    }
-
-    // --- PROJECTS LIST DIALOG ---
-    if (showProjectsDialog) {
-        val listStr = sharedPreferences.getString("all_project_keys", "[]") ?: "[]"
-        val keysArr = JSONArray(listStr)
-        val savedItems = remember {
-            val list = mutableListOf<Triple<String, String, Long>>()
-            for (i in 0 until keysArr.length()) {
-                val k = keysArr.getString(i)
-                val data = sharedPreferences.getString(k, null)
-                if (data != null) {
-                    val obj = JSONObject(data)
-                    val name = obj.optString("name", "Projekt")
-                    val time = obj.optLong("savedAt", 0L)
-                    list.add(Triple(k, name, time))
-                }
-            }
-            list
-        }
-
-        AlertDialog(
-            onDismissRequest = { showProjectsDialog = false },
-            title = { Text("📁 Gespeicherte Spiele & Projekte") },
-            text = {
-                if (savedItems.isEmpty()) {
-                    Text("Noch keine gespeicherten Spiele vorhanden.\nNutze '💾 Speichern' um dein Projekt zu sichern.", color = Color.Gray)
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 280.dp)
-                    ) {
-                        items(savedItems) { item ->
-                            Surface(
-                                color = Color(0xFF1E293B),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val data = sharedPreferences.getString(item.first, null)
-                                        if (data != null) {
-                                            val obj = JSONObject(data)
-                                            htmlCode = obj.optString("html", "")
-                                            cssCode = obj.optString("css", "")
-                                            jsCode = obj.optString("js", "")
-                                            currentTab = "HTML"
-                                            runCode()
-                                            statusMessage = "Projekt '${item.second}' geladen."
-                                            showProjectsDialog = false
-                                        }
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(item.second, fontWeight = FontWeight.Bold, color = Color.White)
-                                        Text("Geladen durch Antippen", color = Color.Gray, fontSize = 11.sp)
-                                    }
-                                    Text("Laden ▶", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                status = "Profil-Metadaten werden geladen …"
+                                try {
+                                    val meta = withContext(Dispatchers.IO) { fetchOEmbed(profileUrl.trim()) }
+                                    profileInfo = "${meta.author}\n${meta.title}\nTyp: ${meta.type}\n${meta.authorUrl}"
+                                    status = "Profil geprüft. TikToks oEmbed liefert Profil-Metadaten, aber keine vollständige Video-Liste."
+                                } catch (e: Exception) {
+                                    profileInfo = "Profil konnte nicht automatisch gelesen werden."
+                                    status = "Profilprüfung fehlgeschlagen: ${e.message ?: "TikTok blockiert den Abruf"}"
                                 }
                             }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showProjectsDialog = false }) {
-                    Text("Schließen")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Profil prüfen") }
+                    Spacer(Modifier.height(8.dp))
+                    Text(profileInfo, style = MaterialTheme.typography.bodySmall)
                 }
             }
+
+            item {
+                SectionCard("Video hinzufügen") {
+                    OutlinedTextField(
+                        value = videoUrl,
+                        onValueChange = { videoUrl = it },
+                        label = { Text("TikTok-Video-Link") },
+                        placeholder = { Text("https://www.tiktok.com/@name/video/…") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                val input = videoUrl.trim()
+                                if (!input.contains("tiktok.com", ignoreCase = true)) {
+                                    status = "Bitte einen TikTok-Link einfügen."
+                                } else {
+                                    scope.launch {
+                                        status = "TikTok-Metadaten werden geladen …"
+                                        try {
+                                            val meta = withContext(Dispatchers.IO) { fetchOEmbed(input) }
+                                            val item = VideoItem(
+                                                id = UUID.randomUUID().toString(),
+                                                source = "TikTok oEmbed",
+                                                url = input,
+                                                title = meta.title.ifBlank { "TikTok-Video" },
+                                                author = meta.author,
+                                                durationSec = 0.0,
+                                                width = 0,
+                                                height = 0,
+                                                openingEnergy = hookSignal(meta.title),
+                                                hashtags = extractHashtags(meta.title)
+                                            )
+                                            videos.add(0, item)
+                                            saveVideos(context, videos)
+                                            videoUrl = ""
+                                            status = "Video hinzugefügt. Hook-Signal ${item.openingEnergy}/100 (Text-Heuristik)."
+                                        } catch (e: Exception) {
+                                            status = "TikTok-Link konnte nicht gelesen werden: ${e.message ?: "Abruf blockiert"}"
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Link analysieren") }
+                        OutlinedButton(
+                            onClick = { importVideo.launch(arrayOf("video/*")) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Video importieren") }
+                    }
+                }
+            }
+
+            item {
+                SectionCard("Agent-Bericht") {
+                    Text(buildReport(videos), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            item {
+                SectionCard("Export") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { jsonExport.launch("tiktok-analyse.json") }, modifier = Modifier.weight(1f)) {
+                            Text("JSON")
+                        }
+                        OutlinedButton(onClick = { csvExport.launch("tiktok-analyse.csv") }, modifier = Modifier.weight(1f)) {
+                            Text("CSV")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            videos.clear()
+                            saveVideos(context, videos)
+                            status = "Projektliste geleert."
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Analyseliste leeren") }
+                }
+            }
+
+            item {
+                Text("Analysierte Videos (${videos.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+
+            if (videos.isEmpty()) {
+                item {
+                    Text("Noch keine Videos. Ein TikTok-Link oder eine lokale Datei reicht zum Start.")
+                }
+            }
+
+            items(videos, key = { it.id }) { item ->
+                VideoCard(item = item, onDelete = {
+                    videos.remove(item)
+                    saveVideos(context, videos)
+                    status = "Eintrag entfernt."
+                })
+            }
+
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Text(status, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun VideoCard(item: VideoItem, onDelete: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(item.title, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (item.author.isNotBlank()) Text("Creator: ${item.author}", style = MaterialTheme.typography.bodySmall)
+            Text("Quelle: ${item.source}", style = MaterialTheme.typography.bodySmall)
+            if (item.durationSec > 0) {
+                Text("${item.durationSec.format1()} s · ${item.width}×${item.height} · Opening-Energie ${item.openingEnergy}/100", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Text("Hook-Signal ${item.openingEnergy}/100 · Text-Heuristik", style = MaterialTheme.typography.bodySmall)
+            }
+            if (item.hashtags.isNotEmpty()) Text(item.hashtags.joinToString("  ") { "#$it" }, style = MaterialTheme.typography.bodySmall)
+            if (item.url.isNotBlank()) Text(item.url, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) { Text("Entfernen") }
+        }
+    }
+}
+
+private fun fetchOEmbed(rawUrl: String): OEmbedMeta {
+    if (rawUrl.isBlank()) throw IllegalArgumentException("Link fehlt")
+    val encoded = URLEncoder.encode(rawUrl, Charsets.UTF_8.name())
+    val connection = URL("https://www.tiktok.com/oembed?url=$encoded").openConnection() as HttpURLConnection
+    connection.requestMethod = "GET"
+    connection.connectTimeout = 12_000
+    connection.readTimeout = 12_000
+    connection.instanceFollowRedirects = true
+    connection.setRequestProperty("User-Agent", "Mozilla/5.0 Android TikTokVideoAnalyseAgent/1.0")
+    try {
+        val code = connection.responseCode
+        val body = if (code in 200..299) connection.inputStream.bufferedReader().use { it.readText() }
+        else connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        if (code !in 200..299) throw IOException("TikTok HTTP $code${if (body.isNotBlank()) ": ${body.take(120)}" else ""}")
+        val json = JSONObject(body)
+        return OEmbedMeta(
+            title = json.optString("title"),
+            author = json.optString("author_name"),
+            authorUrl = json.optString("author_url"),
+            type = json.optString("type"),
+            thumbnail = json.optString("thumbnail_url")
+        )
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun analyzeLocalVideo(context: Context, uri: Uri): VideoItem {
+    val retriever = MediaMetadataRetriever()
+    try {
+        context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+            retriever.setDataSource(pfd.fileDescriptor)
+        } ?: throw IOException("Datei kann nicht geöffnet werden")
+
+        val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+        val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+        val energy = calculateOpeningEnergy(retriever, durationMs)
+        val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Lokales Video"
+
+        return VideoItem(
+            id = UUID.randomUUID().toString(),
+            source = "Lokale Datei",
+            url = uri.toString(),
+            title = name,
+            author = "",
+            durationSec = durationMs / 1000.0,
+            width = width,
+            height = height,
+            openingEnergy = energy,
+            hashtags = emptyList()
+        )
+    } finally {
+        retriever.release()
+    }
+}
+
+private fun calculateOpeningEnergy(retriever: MediaMetadataRetriever, durationMs: Long): Int {
+    if (durationMs <= 0) return 0
+    val endUs = minOf(durationMs * 1000L, 5_000_000L)
+    val lumas = mutableListOf<Double>()
+    for (i in 0..4) {
+        val timeUs = endUs * i / 4L
+        val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+        if (bitmap != null) lumas += averageLuma(bitmap)
+    }
+    if (lumas.size < 2) return 0
+    val averageDelta = lumas.zipWithNext { a, b -> abs(a - b) }.average()
+    return ((averageDelta / 64.0) * 100.0).roundToInt().coerceIn(0, 100)
+}
+
+private fun averageLuma(bitmap: Bitmap): Double {
+    val scaled = Bitmap.createScaledBitmap(bitmap, 24, 24, true)
+    val pixels = IntArray(24 * 24)
+    scaled.getPixels(pixels, 0, 24, 0, 0, 24, 24)
+    var total = 0.0
+    for (pixel in pixels) {
+        total += 0.2126 * Color.red(pixel) + 0.7152 * Color.green(pixel) + 0.0722 * Color.blue(pixel)
+    }
+    if (scaled !== bitmap) scaled.recycle()
+    bitmap.recycle()
+    return total / pixels.size
+}
+
+private fun hookSignal(title: String): Int {
+    if (title.isBlank()) return 20
+    val t = title.trim().lowercase(Locale.GERMAN)
+    var score = 35
+    if ('?' in t) score += 20
+    if (Regex("\\d").containsMatchIn(t.take(24))) score += 12
+    if (listOf("warum", "wie", "wenn", "du ", "dein", "stop", "achtung", "so ").any { t.startsWith(it) || " $it" in t }) score += 18
+    if (title.length in 25..120) score += 10
+    if (extractHashtags(title).isNotEmpty()) score += 5
+    return score.coerceIn(0, 100)
+}
+
+private fun extractHashtags(text: String): List<String> =
+    Regex("""#([\p{L}\p{N}_]+)""").findAll(text).map { it.groupValues[1].lowercase(Locale.GERMAN) }.distinct().toList()
+
+private fun buildReport(videos: List<VideoItem>): String {
+    if (videos.isEmpty()) return "Noch keine Datengrundlage. Füge Video-Links hinzu oder importiere Dateien."
+
+    val linked = videos.count { it.source == "TikTok oEmbed" }
+    val local = videos.count { it.source == "Lokale Datei" }
+    val durations = videos.map { it.durationSec }.filter { it > 0 }
+    val averageDuration = durations.takeIf { it.isNotEmpty() }?.average()
+    val averageSignal = videos.map { it.openingEnergy }.average().roundToInt()
+    val tags = videos.flatMap { it.hashtags }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(5)
+    val creators = videos.map { it.author }.filter { it.isNotBlank() }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(3)
+    val topHooks = videos.sortedByDescending { it.openingEnergy }.take(3).joinToString("\n") { "• ${it.title.take(72)} (${it.openingEnergy}/100)" }
+
+    return buildString {
+        append("Datensatz: ${videos.size} Videos ($linked TikTok-Links, $local lokal).\n")
+        if (averageDuration != null) append("Ø lokale Videolänge: ${averageDuration.format1()} s.\n")
+        append("Ø Opening-/Hook-Signal: $averageSignal/100. Bei lokalen Dateien basiert es auf Bildwechseln der ersten 5 Sekunden, bei TikTok-Links auf einer Text-Heuristik der Caption.\n")
+        if (tags.isNotEmpty()) append("Häufige Hashtags: ${tags.joinToString { "#${it.key} (${it.value})" }}.\n")
+        if (creators.isNotEmpty()) append("Creator im Datensatz: ${creators.joinToString { "${it.key} (${it.value})" }}.\n")
+        append("\nAuffällige Hooks nach Signal:\n$topHooks\n")
+        append("\nGrenze der Daten: TikTok-oEmbed liefert Titel/Creator/Embed-Daten, aber keine vollständige Account-Videoliste und keine verlässlichen View-/Like-/Kommentarzahlen. Für die offizielle Account-Videoliste ist TikTok-OAuth des Kontoinhabers nötig.")
+    }
+}
+
+private fun saveVideos(context: Context, videos: List<VideoItem>) {
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(PREF_VIDEOS, videosToJson(videos).toString())
+        .apply()
+}
+
+private fun loadVideos(context: Context): List<VideoItem> {
+    val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PREF_VIDEOS, null) ?: return emptyList()
+    return runCatching {
+        val array = JSONArray(raw)
+        buildList {
+            for (i in 0 until array.length()) {
+                val o = array.getJSONObject(i)
+                val tagArray = o.optJSONArray("hashtags") ?: JSONArray()
+                val tags = buildList { for (j in 0 until tagArray.length()) add(tagArray.optString(j)) }
+                add(
+                    VideoItem(
+                        id = o.optString("id", UUID.randomUUID().toString()),
+                        source = o.optString("source"),
+                        url = o.optString("url"),
+                        title = o.optString("title"),
+                        author = o.optString("author"),
+                        durationSec = o.optDouble("durationSec", 0.0),
+                        width = o.optInt("width", 0),
+                        height = o.optInt("height", 0),
+                        openingEnergy = o.optInt("openingEnergy", 0),
+                        hashtags = tags
+                    )
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+}
+
+private fun videosToJson(videos: List<VideoItem>): JSONArray {
+    val array = JSONArray()
+    videos.forEach { v ->
+        array.put(JSONObject().apply {
+            put("id", v.id)
+            put("source", v.source)
+            put("url", v.url)
+            put("title", v.title)
+            put("author", v.author)
+            put("durationSec", v.durationSec)
+            put("width", v.width)
+            put("height", v.height)
+            put("openingEnergy", v.openingEnergy)
+            put("hashtags", JSONArray(v.hashtags))
+        })
+    }
+    return array
+}
+
+private fun videosToCsv(videos: List<VideoItem>): String = buildString {
+    appendLine("source,title,author,url,duration_seconds,width,height,opening_energy,hashtags")
+    videos.forEach { v ->
+        appendLine(
+            listOf(
+                v.source, v.title, v.author, v.url, v.durationSec.format1(), v.width.toString(), v.height.toString(),
+                v.openingEnergy.toString(), v.hashtags.joinToString(" ") { "#$it" }
+            ).joinToString(",") { csv(it) }
         )
     }
 }
 
-private fun jumpPowerMultiplier(v: Float): Float {
-    return v * 100f
+private fun csv(value: String): String = "\"${value.replace("\"", "\"\"")}\""
+
+private fun writeText(context: Context, uri: Uri, text: String) {
+    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(text) }
+        ?: throw IOException("Zieldatei kann nicht geöffnet werden")
 }
+
+private fun Double.format1(): String = String.format(Locale.GERMAN, "%.1f", this)
