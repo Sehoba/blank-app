@@ -12,6 +12,7 @@ on:
       - '.github/workflows/build-gorilla-fia-level2.yml'
   workflow_dispatch:
 
+# v5 rebuild with WebAPK identity + maskable icon
 jobs:
   build-apk:
     runs-on: ubuntu-latest
