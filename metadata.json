@@ -1,0 +1,6 @@
+{
+  "name": "Self App Builder IDE",
+  "description": "An on-device IDE for writing and testing HTML, CSS, and JavaScript directly on Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
