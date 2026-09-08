@@ -1,9 +1,3 @@
 <resources>
-    <string name="app_name">Self App Builder IDE</string>
-    <string name="title_game_creator">Spiel erstellen</string>
-    <string name="action_run">Ausführen</string>
-    <string name="action_fullscreen">Vollbild</string>
-    <string name="action_save">Speichern</string>
-    <string name="action_load">Projekte</string>
-    <string name="action_reset">Reset</string>
+    <string name="app_name">TikTok Video Analyse Agent</string>
 </resources>
