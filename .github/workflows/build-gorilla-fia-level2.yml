@@ -36,6 +36,23 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Export Android apksigner tool
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          echo "Using build-tools: $BT"
+          mkdir -p signer-tool/lib
+          cp "$BT/apksigner" signer-tool/apksigner
+          cp "$BT/lib/apksigner.jar" signer-tool/lib/apksigner.jar
+          chmod +x signer-tool/apksigner
+
+      - name: Upload apksigner tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-ApkSigner-Tool
+          path: signer-tool
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Build web game and Android project
         working-directory: gorilla-fia
         run: |
