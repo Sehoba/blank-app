@@ -1,0 +1,43 @@
+name: Mouth motion montage
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: Direct HTTPS download of source video
+        required: true
+        type: string
+      audio_url:
+        description: Direct HTTPS download of audio (extract ZIP first)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install numpy==2.2.6 opencv-python-headless==4.12.0.88
+      - name: Download media
+        env:
+          VIDEO_URL: ${{ inputs.video_url }}
+          AUDIO_URL: ${{ inputs.audio_url }}
+        run: |
+          curl --proto '=https' --proto-redir '=https' -L --fail --max-time 300 "$VIDEO_URL" -o source.mp4
+          curl --proto '=https' --proto-redir '=https' -L --fail --max-time 300 "$AUDIO_URL" -o voice.audio
+      - name: Analyze and render
+        run: python tools/mouth_cut.py source.mp4 voice.audio output/mouth-motion.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mouth-motion-montage
+          path: output/
+          if-no-files-found: error
+          retention-days: 7
