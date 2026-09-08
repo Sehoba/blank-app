@@ -1,0 +1,52 @@
+name: Video Production Render
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - video-production
+    paths:
+      - 'video-production/**'
+      - '.github/workflows/video-production.yml'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Prepare folders
+        run: |
+          mkdir -p video-production/input
+          mkdir -p video-production/output
+
+      - name: Check media inputs
+        run: |
+          test -f video-production/input/video.mp4 || (echo 'Missing video-production/input/video.mp4' && exit 1)
+          test -f video-production/input/audio.opus || (echo 'Missing video-production/input/audio.opus' && exit 1)
+
+      - name: Render prepared video
+        working-directory: video-production
+        run: |
+          python3 scripts/prepare_media.py \
+            --video input/video.mp4 \
+            --audio input/audio.opus \
+            --out output
+
+      - name: Show media info
+        run: |
+          ffprobe -hide_banner video-production/output/video_with_voice.mp4
+
+      - name: Upload rendered files
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-production-output
+          path: video-production/output/
+          if-no-files-found: error
