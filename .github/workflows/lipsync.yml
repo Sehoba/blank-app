@@ -1,0 +1,51 @@
+name: Build LipSync Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: Direct URL to source MP4
+        required: true
+        type: string
+      audio_url:
+        description: Direct URL to source audio (opus/mp3/wav)
+        required: true
+        type: string
+      start_seconds:
+        description: Start position for replacing audio
+        required: false
+        default: "0"
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Download sources
+        run: |
+          curl -L --fail "${{ inputs.video_url }}" -o source.mp4
+          curl -L --fail "${{ inputs.audio_url }}" -o voice.opus
+
+      - name: Normalize voice
+        run: |
+          ffmpeg -y -i voice.opus -ar 48000 -ac 2 voice.wav
+
+      - name: Replace video audio with voice track
+        run: |
+          ffmpeg -y \
+            -i source.mp4 \
+            -itsoffset "${{ inputs.start_seconds }}" -i voice.wav \
+            -filter_complex "[1:a]apad[a1]" \
+            -map 0:v:0 -map "[a1]" \
+            -c:v copy -c:a aac -b:a 192k \
+            -shortest lipsync_ready.mp4
+
+      - name: Upload rendered video
+        uses: actions/upload-artifact@v4
+        with:
+          name: lipsync-ready-video
+          path: lipsync_ready.mp4
+          retention-days: 7
