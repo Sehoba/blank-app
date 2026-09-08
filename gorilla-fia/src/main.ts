@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import './style.css';
 import { GameScene } from './game/GameScene';
 import { Level2Scene } from './game/Level2Scene';
+import { installVisualStyle } from './game/VisualStyle';
 import { clearSave, loadSave, maxHp, xpToNext, type PlayerStats } from './game/types';
 
 const $=<T extends HTMLElement>(q:string)=>document.querySelector<T>(q)!;
@@ -13,8 +14,8 @@ let game:Phaser.Game|null=null;let toastTimer=0;let activeScene='game';let modal
 function boot(scene:'game'|'level2',continuing:boolean){
   activeScene=scene;menu.classList.add('hidden');modal.classList.add('hidden');skillpanel.classList.add('hidden');hud.classList.remove('hidden');bossbar.classList.add('hidden');
   if(game){game.destroy(true);document.querySelector('#game')!.innerHTML=''}
-  game=new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#07140d',pixelArt:true,antialias:false,scale:{mode:Phaser.Scale.RESIZE,autoCenter:Phaser.Scale.CENTER_BOTH,width:1280,height:720},physics:{default:'arcade',arcade:{gravity:{x:0,y:1450},debug:false}},scene:[GameScene,Level2Scene],render:{roundPixels:true,powerPreference:'high-performance'},input:{activePointers:6}});
-  game.events.once(Phaser.Core.Events.READY,()=>game?.scene.start(scene,scene==='game'?{continue:continuing}:{continue:continuing}));
+  game=new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#101714',pixelArt:true,antialias:false,scale:{mode:Phaser.Scale.RESIZE,autoCenter:Phaser.Scale.CENTER_BOTH,width:1280,height:720},physics:{default:'arcade',arcade:{gravity:{x:0,y:1450},debug:false}},scene:[GameScene,Level2Scene],render:{roundPixels:true,powerPreference:'high-performance'},input:{activePointers:6}});
+  game.events.once(Phaser.Core.Events.READY,()=>{if(!game)return;installVisualStyle(game);game.scene.start(scene,scene==='game'?{continue:continuing}:{continue:continuing})});
 }
 function backToMenu(){game?.destroy(true);game=null;document.querySelector('#game')!.innerHTML='';hud.classList.add('hidden');modal.classList.add('hidden');skillpanel.classList.add('hidden');menu.classList.remove('hidden');refreshMenu()}
 function hp(n:number,max=5){hearts.innerHTML='';for(let i=0;i<max;i++){const s=document.createElement('span');s.textContent=i<n?'♥':'♡';hearts.append(s)}}
