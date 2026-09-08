@@ -1,0 +1,46 @@
+name: Build TikTok Video Analyse Agent APK
+
+on:
+  push:
+    branches:
+      - tiktok-video-analyse-agent
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Compile debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Prepare APK
+        run: |
+          mkdir -p apk-out
+          cp app/build/outputs/apk/debug/app-debug.apk "apk-out/TikTok-Video-Analyse-Agent.apk"
+          sha256sum "apk-out/TikTok-Video-Analyse-Agent.apk" > "apk-out/SHA256.txt"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TikTok-Video-Analyse-Agent-APK
+          path: apk-out/
+          if-no-files-found: error
+          retention-days: 30
