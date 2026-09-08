@@ -1,4 +1,4 @@
-name: Build Gorilla & Fia Level 2 APK
+name: Build Gorilla & Fia Merged APK
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Checkout game branch
+      - name: Checkout merged game branch
         uses: actions/checkout@v4
         with:
           ref: gorilla-fia-level2-apk
@@ -53,7 +53,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Build web game and Android project
+      - name: Build merged web game and Android project
         working-directory: gorilla-fia
         run: |
           npm install --no-audit --no-fund
@@ -63,8 +63,8 @@ jobs:
       - name: Apply Android app identity and fullscreen
         working-directory: gorilla-fia
         run: |
-          sed -i 's/versionCode 1/versionCode 3/' android/app/build.gradle
-          sed -i 's/versionName "1.0"/versionName "3.0"/' android/app/build.gradle
+          sed -i 's/versionCode 1/versionCode 4/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "4.0-merged"/' android/app/build.gradle
           mkdir -p android/app/src/main/res/drawable
           base64 -d app_icon.b64 > android/app/src/main/res/drawable/gorilla_fia_icon.png
           python3 - <<'PY'
@@ -114,11 +114,11 @@ jobs:
       - name: Upload APK
         run: |
           mkdir -p apk-out
-          cp gorilla-fia/android/app/build/outputs/apk/debug/app-debug.apk 'apk-out/Gorilla-Fia-v3-CoreStyle.apk'
+          cp gorilla-fia/android/app/build/outputs/apk/debug/app-debug.apk 'apk-out/Gorilla-Fia-v4-Merged.apk'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Gorilla-Fia-v3-CoreStyle-APK
-          path: apk-out/Gorilla-Fia-v3-CoreStyle.apk
+          name: Gorilla-Fia-v4-Merged-APK
+          path: apk-out/Gorilla-Fia-v4-Merged.apk
           if-no-files-found: error
           retention-days: 30
