@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#07140d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <title>Gorilla & Fia: Die Dschungelkrone</title>
   </head>
   <body>
@@ -48,5 +52,10 @@
       <button id="stats-close" class="primary">ZURÜCK INS SPIEL</button>
     </div></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+      }
+    </script>
   </body>
 </html>
