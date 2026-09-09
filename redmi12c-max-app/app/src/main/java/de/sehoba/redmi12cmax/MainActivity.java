@@ -27,6 +27,7 @@ public class MainActivity extends Activity {
     private static final String TERMUX_PACKAGE = "com.termux";
     private static final String TERMUX_PERMISSION = "com.termux.permission.RUN_COMMAND";
     private static final String TERMUX_SERVICE = "com.termux.app.RunCommandService";
+    private static final String SYSTEM_UPDATE_ACTION = "android.settings.SYSTEM_UPDATE_SETTINGS";
     private static final int REQ_TERMUX = 1201;
 
     private static final Pattern ENDPOINT = Pattern.compile("^(?:\\d{1,3}\\.){3}\\d{1,3}:\\d{1,5}$");
@@ -52,11 +53,10 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Color.rgb(245, 245, 245));
         scroll.addView(root);
 
-        TextView title = text("Redmi 12C Max", 28, true);
-        root.addView(title);
+        root.addView(text("Redmi 12C Max", 28, true));
 
         TextView intro = text(
-                "HyperOS-Update öffnen, Termux vorbereiten und die Redmi-12C-Optimierung aus GitHub starten. Kein Root, kein Bootloader-Unlock.",
+                "HyperOS aktualisieren, Termux vorbereiten und die Redmi-12C-Optimierung per Wireless ADB starten.",
                 15, false);
         intro.setPadding(0, dp(8), 0, dp(14));
         root.addView(intro);
@@ -75,25 +75,23 @@ public class MainActivity extends Activity {
         root.addView(setup, matchWrapTop());
 
         TextView hint = text(
-                "Optional: Für die erste Wireless-ADB-Verbindung die Daten aus Entwickleroptionen → Wireless-Debugging eintragen.",
+                "Für die erste Verbindung: Entwickleroptionen → Wireless-Debugging → Gerät mit Kopplungscode koppeln.",
                 13, false);
         hint.setPadding(0, dp(18), 0, dp(6));
         root.addView(hint);
 
         pairAddress = field("Pairing-Adresse, z. B. 192.168.1.25:37123", false);
-        root.addView(pairAddress, matchWrapTopSmall());
-
         pairCode = field("6-stelliger Pairing-Code", true);
-        root.addView(pairCode, matchWrapTopSmall());
-
         debugAddress = field("ADB-Adresse, z. B. 192.168.1.25:42891", false);
+        root.addView(pairAddress, matchWrapTopSmall());
+        root.addView(pairCode, matchWrapTopSmall());
         root.addView(debugAddress, matchWrapTopSmall());
 
         Button auto = button("3. ADB koppeln + MAX optimieren");
         auto.setOnClickListener(v -> runFullInstall(true));
         root.addView(auto, matchWrapTop());
 
-        Button optimize = button("Nur MAX optimieren (ADB bereits verbunden)");
+        Button optimize = button("Nur MAX optimieren (ADB schon verbunden)");
         optimize.setOnClickListener(v -> runFullInstall(false));
         root.addView(optimize, matchWrapTopSmall());
 
@@ -102,11 +100,10 @@ public class MainActivity extends Activity {
         root.addView(restore, matchWrapTopSmall());
 
         TextView footer = text(
-                "Die APK darf Android-Sicherheitsgrenzen nicht umgehen. Firmware wird deshalb über Xiaomis System-Updater installiert; privilegierte Optimierungen laufen sichtbar über Termux + Wireless ADB.",
+                "Kein Root und kein Bootloader-Unlock. Die Firmware bleibt im Xiaomi-System-Updater; ADB-Optimierungen laufen über deine freigegebene Termux-Sitzung.",
                 12, false);
         footer.setPadding(0, dp(20), 0, 0);
         root.addView(footer);
-
         return scroll;
     }
 
@@ -114,25 +111,29 @@ public class MainActivity extends Activity {
         String device = getProp("ro.product.device");
         String model = getProp("ro.product.model");
         String build = getProp("ro.build.version.incremental");
-        boolean termux = isPackageInstalled(TERMUX_PACKAGE);
 
         StringBuilder sb = new StringBuilder();
         sb.append("Modell: ").append(empty(model, android.os.Build.MODEL)).append('\n');
         sb.append("Codename: ").append(empty(device, "unbekannt")).append('\n');
         sb.append("Build: ").append(empty(build, android.os.Build.DISPLAY)).append('\n');
-        sb.append("Termux: ").append(termux ? "installiert" : "nicht gefunden").append('\n');
+        sb.append("Termux: ").append(isPackageInstalled(TERMUX_PACKAGE) ? "installiert" : "nicht gefunden").append('\n');
         sb.append("RUN_COMMAND: ").append(hasTermuxPermission() ? "erlaubt" : "noch nicht erlaubt");
-
         if (!"earth".equals(device)) {
-            sb.append("\n\n⚠ Dieses Projekt ist für Redmi 12C (earth) vorgesehen.");
+            sb.append("\n\n⚠ Optimierung wird nur auf Redmi 12C / earth gestartet.");
         }
         status.setText(sb.toString());
     }
 
     private void openSystemUpdater() {
+        Intent update = new Intent(SYSTEM_UPDATE_ACTION);
         try {
-            startActivity(new Intent(Settings.ACTION_SYSTEM_UPDATE_SETTINGS));
-        } catch (Exception first) {
+            if (update.resolveActivity(getPackageManager()) != null) {
+                startActivity(update);
+            } else {
+                startActivity(new Intent(Settings.ACTION_SETTINGS));
+                toast("Direkter HyperOS-Updater nicht auflösbar. Systemeinstellungen wurden geöffnet.");
+            }
+        } catch (Exception e) {
             try {
                 startActivity(new Intent(Settings.ACTION_SETTINGS));
             } catch (Exception ignored) {
@@ -143,7 +144,7 @@ public class MainActivity extends Activity {
 
     private void prepareTermux() {
         if (!isPackageInstalled(TERMUX_PACKAGE)) {
-            toast("Termux ist nicht installiert. Installiere zuerst die aktuelle Termux-Version.");
+            toast("Termux ist nicht installiert.");
             return;
         }
 
@@ -153,59 +154,53 @@ public class MainActivity extends Activity {
                 "printf '\\nallow-external-apps=true\\n' >> ~/.termux/termux.properties) && termux-reload-settings";
 
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText("Redmi12C Max Termux Setup", setup));
+        clipboard.setPrimaryClip(ClipData.newPlainText("Redmi12C Max Setup", setup));
 
         if (!hasTermuxPermission()) {
             requestPermissions(new String[]{TERMUX_PERMISSION}, REQ_TERMUX);
         }
-
         Intent launch = getPackageManager().getLaunchIntentForPackage(TERMUX_PACKAGE);
         if (launch != null) startActivity(launch);
-        toast("Setup-Befehl kopiert. In Termux einmal einfügen und ausführen.");
+        toast("Termux-Setup ist kopiert. Einmal in Termux einfügen und ausführen.");
     }
 
     private void runFullInstall(boolean pairFirst) {
         if (!preflight()) return;
 
         StringBuilder cmd = new StringBuilder();
-        cmd.append("set -e; ");
-        cmd.append("pkg update -y && pkg upgrade -y && pkg install -y git android-tools; ");
+        cmd.append("set -e; pkg update -y && pkg upgrade -y && pkg install -y git android-tools; ");
 
         if (pairFirst) {
             String pair = pairAddress.getText().toString().trim();
             String code = pairCode.getText().toString().trim();
             String debug = debugAddress.getText().toString().trim();
-
             if (!ENDPOINT.matcher(pair).matches() || !PAIR_CODE.matcher(code).matches() || !ENDPOINT.matcher(debug).matches()) {
                 toast("Pairing-Adresse, 6-stelligen Code und ADB-Adresse korrekt eintragen.");
                 return;
             }
-
             cmd.append("printf '%s\\n' '").append(code).append("' | adb pair '").append(pair).append("'; ");
             cmd.append("adb connect '").append(debug).append("'; ");
         }
 
-        cmd.append("cd \"$HOME\"; ");
+        cmd.append("adb get-state >/dev/null; cd \"$HOME\"; ");
         cmd.append("if [ -d blank-app/.git ]; then git -C blank-app pull --ff-only; ");
         cmd.append("else git clone --depth 1 https://github.com/Sehoba/blank-app.git; fi; ");
-        cmd.append("cd \"$HOME/blank-app/redmi12c-max\"; ");
-        cmd.append("chmod +x optimize.sh restore.sh; ");
-        cmd.append("./optimize.sh --debloat --compile; ");
-        cmd.append("echo; echo 'Redmi 12C Max abgeschlossen. Neustart empfohlen.'");
+        cmd.append("cd \"$HOME/blank-app/redmi12c-max\"; chmod +x optimize.sh restore.sh; ");
+        cmd.append("./optimize.sh --debloat --compile; echo; echo 'Redmi 12C Max abgeschlossen.'");
 
-        runInTermux(cmd.toString(), "Redmi 12C MAX Optimierung");
+        runInTermux(cmd.toString(), "Redmi 12C MAX");
     }
 
     private void runRestore() {
         if (!preflight()) return;
-        String cmd = "set -e; cd \"$HOME/blank-app/redmi12c-max\" && chmod +x restore.sh && ./restore.sh";
-        runInTermux(cmd, "Redmi 12C MAX Restore");
+        runInTermux(
+                "set -e; cd \"$HOME/blank-app/redmi12c-max\" && chmod +x restore.sh && ./restore.sh",
+                "Redmi 12C Restore");
     }
 
     private boolean preflight() {
-        String device = getProp("ro.product.device");
-        if (!"earth".equals(device)) {
-            toast("Abbruch: Gerät ist nicht als Redmi 12C / earth erkannt.");
+        if (!"earth".equals(getProp("ro.product.device"))) {
+            toast("Abbruch: Das Gerät ist nicht Redmi 12C / earth.");
             return false;
         }
         if (!isPackageInstalled(TERMUX_PACKAGE)) {
@@ -214,31 +209,27 @@ public class MainActivity extends Activity {
         }
         if (!hasTermuxPermission()) {
             requestPermissions(new String[]{TERMUX_PERMISSION}, REQ_TERMUX);
-            toast("Erlaube zuerst 'Befehle in Termux ausführen'. Danach erneut starten.");
+            toast("RUN_COMMAND-Berechtigung erlauben und danach erneut starten.");
             return false;
         }
         return true;
     }
 
     private void runInTermux(String command, String label) {
-        Intent intent = new Intent();
+        Intent intent = new Intent("com.termux.RUN_COMMAND");
         intent.setClassName(TERMUX_PACKAGE, TERMUX_SERVICE);
-        intent.setAction("com.termux.RUN_COMMAND");
         intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash");
         intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-lc", command});
         intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
         intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
         intent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0");
-        intent.putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", label);
-        intent.putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Redmi 12C HyperOS/ADB Optimierung");
-
         try {
             startService(intent);
-            toast("Termux-Auftrag gestartet.");
+            toast(label + " wurde in Termux gestartet.");
         } catch (SecurityException e) {
-            toast("RUN_COMMAND-Berechtigung fehlt oder allow-external-apps ist noch nicht aktiv.");
+            toast("Termux RUN_COMMAND ist noch nicht freigegeben.");
         } catch (Exception e) {
-            toast("Termux-Auftrag konnte nicht gestartet werden: " + e.getClass().getSimpleName());
+            toast("Termux konnte nicht gestartet werden: " + e.getClass().getSimpleName());
         }
     }
 
@@ -257,7 +248,7 @@ public class MainActivity extends Activity {
 
     private String getProp(String key) {
         try {
-            Process p = new ProcessBuilder("getprop", key).redirectErrorStream(true).start();
+            Process p = new ProcessBuilder("/system/bin/getprop", key).redirectErrorStream(true).start();
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 String line = r.readLine();
                 return line == null ? "" : line.trim();
@@ -267,7 +258,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private String empty(String value, String fallback) {
+    private static String empty(String value, String fallback) {
         return value == null || value.isEmpty() ? fallback : value;
     }
 
