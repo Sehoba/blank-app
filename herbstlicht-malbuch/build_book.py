@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from PIL import Image, ImageOps, ImageFilter, ImageDraw, ImageFont
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent
 INPUT = ROOT / "input"
@@ -26,16 +28,14 @@ def fit_a4(img: Image.Image, background="white") -> Image.Image:
 
 
 def to_coloring(img: Image.Image) -> Image.Image:
-    gray = ImageOps.autocontrast(img.convert("L"))
-    # Kanten gewinnen, invertieren: schwarze Linien auf weißem Papier
-    edges = gray.filter(ImageFilter.FIND_EDGES)
-    edges = ImageOps.invert(edges)
-    edges = ImageOps.autocontrast(edges)
-    # Dünne schwache Kanten entfernen, kräftige Konturen behalten
-    bw = edges.point(lambda p: 255 if p > 205 else 0, mode="1").convert("L")
-    # Linien etwas verstärken
-    bw = bw.filter(ImageFilter.MinFilter(3))
-    return bw.convert("RGB")
+    """Erzeugt eine druckfreundliche Ausmalfassung: weiße Flächen, klare Konturen."""
+    gray = np.array(img.convert("L"))
+    # Leicht glätten, damit Farbverläufe nicht zu schwarzem Rauschen werden.
+    blur = cv2.GaussianBlur(gray, (5, 5), 1.2)
+    edges = cv2.Canny(blur, 80, 170)
+    # Canny liefert weiße Kanten auf schwarz; fürs Malbuch umkehren.
+    lineart = 255 - edges
+    return Image.fromarray(lineart).convert("RGB")
 
 
 def load_font(size: int, bold: bool = False):
