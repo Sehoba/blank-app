@@ -155,10 +155,6 @@ private fun MenuScreen(
                                 if (i == level) Color.White else Color.Transparent,
                                 CircleShape
                             )
-                            .then(
-                                if (i == level) Modifier
-                                else Modifier.background(Color.Transparent, CircleShape)
-                            )
                             .clickable { onLevel(i) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -271,7 +267,7 @@ private fun GameScreen(
                 .pointerInput(result, running, boardSize) {
                     detectDragGestures(
                         onDragStart = { p ->
-                            if (!running && result == null && p.y < boardSize.height * 0.50f) {
+                            if (!running && result == null && isInsideDrawingArea(p, boardSize)) {
                                 pathPoints = listOf(p)
                                 inkUsed = 0f
                             }
@@ -281,8 +277,8 @@ private fun GameScreen(
                                 val p = change.position
                                 val last = pathPoints.last()
                                 val extra = distance(last, p)
-                                val limit = boardSize.width * 1.15f
-                                if (p.y < boardSize.height * 0.50f && inkUsed + extra <= limit) {
+                                val limit = boardSize.width * 1.35f
+                                if (isInsideDrawingArea(p, boardSize) && inkUsed + extra <= limit) {
                                     pathPoints = pathPoints + p
                                     inkUsed += extra
                                 }
@@ -302,19 +298,39 @@ private fun GameScreen(
             val progressY = size.height * 0.066f
             val x1 = size.width * 0.25f
             val x2 = size.width * 0.75f
-            drawLine(Color(0xFFF1F1F1), Offset(x1, progressY), Offset(x2, progressY), 6f, StrokeCap.Round)
+            drawLine(
+                Color(0xFFF1F1F1),
+                Offset(x1, progressY),
+                Offset(x2, progressY),
+                6f,
+                StrokeCap.Round
+            )
             val done = ((7f - timeLeft) / 7f).coerceIn(0f, 1f)
-            drawLine(Color(0xFF222222), Offset(x1, progressY), Offset(x1 + (x2 - x1) * done, progressY), 6f, StrokeCap.Round)
+            drawLine(
+                Color(0xFF222222),
+                Offset(x1, progressY),
+                Offset(x1 + (x2 - x1) * done, progressY),
+                6f,
+                StrokeCap.Round
+            )
 
             drawCat(catCenter(boardSize), size.width * 0.086f)
             hazards.forEach { drawHazard(it) }
 
             if (pathPoints.size > 1) {
                 for (i in 0 until pathPoints.lastIndex) {
+                    val start = pathPoints[i]
+                    val end = pathPoints[i + 1]
+                    val middleY = (start.y + end.y) * 0.5f
+                    val lineColor = if (middleY < size.height * 0.50f) {
+                        Color(0xFF111111)
+                    } else {
+                        Color.White
+                    }
                     drawLine(
-                        color = Color(0xFF111111),
-                        start = pathPoints[i],
-                        end = pathPoints[i + 1],
+                        color = lineColor,
+                        start = start,
+                        end = end,
                         strokeWidth = max(18f, size.width * 0.028f),
                         cap = StrokeCap.Round
                     )
@@ -356,7 +372,7 @@ private fun GameScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Ziehe mit dem Finger eine Linie vor die Katze. Sobald du loslässt, beginnt der Angriff.",
+                    text = "Du kannst jetzt auch im dunklen Bereich zeichnen. Auf dunklem Grund wird die Schutzlinie automatisch weiß.",
                     color = Color(0xFFBDBDBD),
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp
@@ -402,6 +418,13 @@ private fun GameScreen(
             }
         }
     }
+}
+
+private fun isInsideDrawingArea(point: Offset, board: IntSize): Boolean {
+    if (board == IntSize.Zero) return false
+    val w = board.width.toFloat()
+    val h = board.height.toFloat()
+    return point.x in 0f..w && point.y >= h * 0.08f && point.y <= h * 0.90f
 }
 
 private fun spawnHazards(level: Int, board: IntSize): List<Hazard> {
@@ -468,8 +491,8 @@ private fun moveHazard(
             val minD = r + barrierRadius
 
             if (d < minD) {
-                var nx: Float
-                var ny: Float
+                val nx: Float
+                val ny: Float
                 if (d > 0.001f) {
                     nx = dx / d
                     ny = dy / d
@@ -590,19 +613,36 @@ private fun DrawScope.drawCat(center: Offset, scale: Float) {
     drawPath(
         path = tail,
         color = black,
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = s * 0.14f, cap = StrokeCap.Round)
+        style = androidx.compose.ui.graphics.drawscope.Stroke(
+            width = s * 0.14f,
+            cap = StrokeCap.Round
+        )
     )
 
-    drawCircle(Color(0xFFD6E1E6), s * 0.045f, Offset(center.x - s * 0.11f, center.y - s * 0.27f))
-    drawCircle(Color(0xFFD6E1E6), s * 0.045f, Offset(center.x + s * 0.11f, center.y - s * 0.27f))
+    drawCircle(
+        Color(0xFFD6E1E6),
+        s * 0.045f,
+        Offset(center.x - s * 0.11f, center.y - s * 0.27f)
+    )
+    drawCircle(
+        Color(0xFFD6E1E6),
+        s * 0.045f,
+        Offset(center.x + s * 0.11f, center.y - s * 0.27f)
+    )
 }
 
 private fun DrawScope.drawHazard(hazard: Hazard) {
     drawCircle(Color(0xFF050505), hazard.radius, hazard.position)
     drawLine(
         color = Color.White,
-        start = Offset(hazard.position.x - hazard.radius * 0.45f, hazard.position.y - hazard.radius * 0.45f),
-        end = Offset(hazard.position.x + hazard.radius * 0.45f, hazard.position.y + hazard.radius * 0.45f),
+        start = Offset(
+            hazard.position.x - hazard.radius * 0.45f,
+            hazard.position.y - hazard.radius * 0.45f
+        ),
+        end = Offset(
+            hazard.position.x + hazard.radius * 0.45f,
+            hazard.position.y + hazard.radius * 0.45f
+        ),
         strokeWidth = max(5f, hazard.radius * 0.12f),
         cap = StrokeCap.Round
     )
