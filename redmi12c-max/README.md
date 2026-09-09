@@ -36,15 +36,28 @@ adb devices
 
 ## 3. Projekt holen
 
-Solange das Projekt im Branch `redmi12c-max` von `Sehoba/blank-app` liegt:
-
 ```bash
-git clone -b redmi12c-max https://github.com/Sehoba/blank-app.git
+git clone https://github.com/Sehoba/blank-app.git
 cd blank-app/redmi12c-max
 chmod +x optimize.sh restore.sh
 ```
 
-## 4. Sichere Basisoptimierung
+## 4. Master-One-Liner für Termux
+
+Dieser Befehl aktualisiert Termux, installiert Git + ADB, klont oder aktualisiert das Projekt und startet anschließend die maximale konservative Optimierung:
+
+```bash
+pkg update -y && pkg upgrade -y && pkg install -y git android-tools && cd "$HOME" && { [ -d blank-app/.git ] && git -C blank-app pull --ff-only || git clone https://github.com/Sehoba/blank-app.git; } && cd "$HOME/blank-app/redmi12c-max" && chmod +x optimize.sh restore.sh && echo "=== Redmi 12C MAX ===" && adb devices && ./optimize.sh --debloat --compile
+```
+
+Beim ersten Mal muss Wireless ADB vorher gekoppelt und verbunden werden:
+
+```bash
+adb pair IP:PAIRING_PORT
+adb connect IP:ADB_PORT
+```
+
+## Sichere Basisoptimierung
 
 ```bash
 ./optimize.sh
