@@ -1,0 +1,62 @@
+import Phaser from 'phaser';
+import { FEATHER_POSITIONS, GROUND_Y, MOB_SPAWNS, PLATFORMS, REGIONS, WORLD_W, freshSave, loadSave, writeSave, maxHp, meleeDamage, eggDamage, moveMultiplier, xpToNext, type MobState, type SaveData, type PlayerStats } from './types';
+import { GameInput } from './Input';
+
+type MobView={state:MobState;sprite:Phaser.Physics.Arcade.Sprite};
+const evt=(name:string,detail:unknown={})=>window.dispatchEvent(new CustomEvent(name,{detail}));
+
+export class GameScene extends Phaser.Scene{
+  private inputMap!:GameInput; private player!:Phaser.Physics.Arcade.Sprite; private platforms!:Phaser.Physics.Arcade.StaticGroup;
+  private save!:SaveData; private featherViews=new Map<number,Phaser.Physics.Arcade.Image>(); private mobs:MobView[]=[];
+  private attacking=0;private powering=0;private invincible=0;private shootCooldown=0;private jumpLatch=false;private attackLatch=false;private powerLatch=false;private shootLatch=false;
+  private facing=1;private regionIndex=-1;private lastGrounded=0;private playStarted=0;private gongCount=0;
+  private boss?:Phaser.Physics.Arcade.Sprite;private bossHp=18;private bossMax=18;private bossTimer=0;private bossAwake=false;private ending=false;
+  private checkpoints:Phaser.GameObjects.Sprite[]=[];private gongs:Phaser.GameObjects.Sprite[]=[];private gate!:Phaser.Physics.Arcade.Image;private skillHandler=(e:Event)=>this.upgradeSkill((e as CustomEvent).detail.key);
+  constructor(){super('game')}
+
+  create(data:{continue?:boolean}){
+    this.inputMap=new GameInput();this.save=data.continue&&loadSave()?loadSave()!:freshSave();this.playStarted=this.time.now;
+    this.createTextures();this.physics.world.setBounds(0,0,WORLD_W,900);this.cameras.main.setBounds(0,0,WORLD_W,900);this.cameras.main.setBackgroundColor('#102b26');
+    this.drawWorld();this.createPlatforms();this.createProps();this.createCollectibles();
+    this.player=this.physics.add.sprite(this.save.checkpoint.x,this.save.checkpoint.y,'hero-idle').setDepth(10).setCollideWorldBounds(true).setSize(48,70).setOffset(24,19);
+    this.player.setMaxVelocity(360,850).setDragX(900);this.physics.add.collider(this.player,this.platforms);this.createMobs();this.cameras.main.startFollow(this.player,true,.09,.09,0,60);this.cameras.main.setZoom(this.scale.height<560?0.92:1.05);
+    this.createBoss();this.physics.add.collider(this.boss!,this.platforms);this.physics.add.collider(this.player,this.boss!,()=>this.hurtPlayer(this.boss!.x));
+    this.scale.on('resize',()=>this.cameras.main.setZoom(this.scale.height<560?.92:1.05));
+    window.addEventListener('skill-upgrade',this.skillHandler);this.events.once(Phaser.Scenes.Events.SHUTDOWN,()=>window.removeEventListener('skill-upgrade',this.skillHandler));this.save.hp=Math.min(this.save.hp,maxHp(this.save.stats));evt('hud',{show:true,hp:this.save.hp,maxHp:maxHp(this.save.stats),feathers:this.save.feathers.length});evt('rpg',{stats:this.save.stats,next:xpToNext(this.save.stats.level)});this.updateRegion(true);this.toast('Koba & Fia bereit · J Schlag · K Stampfer · L Eischuss');
+  }
+
+  private createTextures(){
+    const g=this.add.graphics().setVisible(false);const tex=(key:string,w:number,h:number,draw:()=>void)=>{g.clear();draw();g.generateTexture(key,w,h)};
+    const hero=(key:string,step:number,attack=false)=>tex(key,96,96,()=>{
+      g.fillStyle(0x000000,.2).fillEllipse(48,89,58,9);g.fillStyle(0x3a2724).fillCircle(44,48,27).fillCircle(29,42,13).fillCircle(61,42,13);
+      g.fillStyle(0x5d4038).fillRoundedRect(23,34,47,39,15).fillCircle(47,28,22);g.fillStyle(0xb98a68).fillEllipse(47,35,27,21);
+      g.fillStyle(0x161313).fillCircle(39,29,3).fillCircle(55,29,3);g.fillStyle(0x251816).fillEllipse(47,39,10,6);
+      g.fillStyle(0x20a7a1).fillRoundedRect(64,31,20,42,7);g.fillStyle(0xf15c83).fillRect(66,27,15,7).fillRect(73,12,8,19).fillCircle(77,10,6);g.fillStyle(0xffd25b).fillTriangle(83,10,92,13,83,16);g.fillStyle(0x111111).fillCircle(79,8,1.5);
+      g.fillStyle(0x4b332c).fillRoundedRect(17,62+step,24,14,7).fillRoundedRect(54,62-step,24,14,7).fillRoundedRect(24,70-step,17,19,6).fillRoundedRect(53,70+step,17,19,6);
+      if(attack){g.fillStyle(0xffe06c,.8).fillCircle(14,54,15);g.lineStyle(4,0xffffff,.7).strokeCircle(14,54,19)}
+    });
+    hero('hero-idle',0);hero('hero-run1',4);hero('hero-run2',-4);hero('hero-jump',2);hero('hero-attack',0,true);
+    tex('pixel',8,8,()=>g.fillStyle(0xffffff).fillRect(0,0,8,8));
+    tex('feather',32,42,()=>{g.fillStyle(0xffdf4f).fillEllipse(13,16,17,29);g.fillStyle(0xfff39a).fillTriangle(13,1,23,17,13,29);g.lineStyle(3,0x8b5829).lineBetween(13,14,20,40);g.fillStyle(0xffffff,.7).fillRect(8,8,3,9)});
+    tex('checkpoint-off',54,85,()=>{g.fillStyle(0x493523).fillRect(23,29,8,56);g.fillStyle(0x69523a).fillTriangle(0,35,50,8,50,53);g.lineStyle(4,0x2a211a).strokeTriangle(0,35,50,8,50,53)});
+    tex('checkpoint-on',54,85,()=>{g.fillStyle(0x493523).fillRect(23,29,8,56);g.fillStyle(0x3df09a).fillTriangle(0,35,50,8,50,53);g.lineStyle(4,0xeaffaf).strokeTriangle(0,35,50,8,50,53)});
+    tex('gong-off',54,72,()=>{g.fillStyle(0x4b3022).fillRect(7,0,7,72).fillRect(40,0,7,72).fillRect(7,4,40,6);g.lineStyle(6,0x9d6a2c).strokeCircle(27,35,18);g.fillStyle(0x6b4023).fillCircle(27,35,5)});
+    tex('gong-on',54,72,()=>{g.fillStyle(0x4b3022).fillRect(7,0,7,72).fillRect(40,0,7,72).fillRect(7,4,40,6);g.fillStyle(0xffd33d).fillCircle(27,35,18);g.lineStyle(4,0xfff0a0).strokeCircle(27,35,18);g.fillStyle(0x9b5e24).fillCircle(27,35,5)});
+    const mob=(key:string,color:number,kind:string)=>tex(key,68,56,()=>{g.fillStyle(0x000000,.2).fillEllipse(34,51,52,8);g.fillStyle(color).fillRoundedRect(9,14,50,35,14);g.fillStyle(color+0x111111).fillCircle(kind==='toucan'?50:20,15,15);g.fillStyle(0xffffff).fillCircle(kind==='toucan'?54:16,12,6);g.fillStyle(0x141414).fillCircle(kind==='toucan'?56:14,12,2);if(kind==='toucan')g.fillStyle(0xffbd39).fillTriangle(62,12,68,20,48,19);else g.fillStyle(0xefe4bc).fillTriangle(4,31,14,25,13,39);g.fillStyle(0x2c201b).fillRect(15,45,10,9).fillRect(44,45,10,9)});
+    mob('beetle',0x365c8c,'beetle');mob('boar',0x944f42,'boar');mob('toucan',0x3b332f,'toucan');mob('idol',0x7d704f,'idol');mob('snake',0x5d8f42,'snake');mob('monkey',0x8a5a36,'monkey');
+    tex('egg',26,20,()=>{g.fillStyle(0xffffff).fillEllipse(13,10,23,17);g.fillStyle(0xffe7a1).fillEllipse(9,7,7,5);g.lineStyle(2,0xc9b985).strokeEllipse(13,10,23,17)});
+    tex('boss',150,150,()=>{g.fillStyle(0x000000,.25).fillEllipse(75,142,120,15);g.fillStyle(0x312536).fillRoundedRect(20,35,110,105,35);g.fillStyle(0x514056).fillCircle(75,47,48);g.fillStyle(0xd3bd70).fillTriangle(28,23,45,0,59,29).fillTriangle(58,19,76,0,91,22).fillTriangle(89,27,111,2,123,37);g.fillStyle(0xff3c50).fillTriangle(39,47,65,53,44,61).fillTriangle(111,47,85,53,106,61);g.fillStyle(0x0d0710).fillEllipse(75,80,48,25);g.fillStyle(0x6d5970).fillRoundedRect(2,70,34,58,13).fillRoundedRect(114,70,34,58,13)});
+    tex('gate',96,180,()=>{g.fillStyle(0x2b2225).fillRoundedRect(0,0,96,180,18);g.fillStyle(0x51454a).fillRoundedRect(10,10,76,160,13);for(let y=24;y<160;y+=34){g.fillStyle(0x251a20).fillRect(15,y,66,8)}g.fillStyle(0xff4254).fillCircle(48,84,13);g.fillStyle(0x150c10).fillCircle(48,84,5)});
+  }
+
+  private drawWorld(){
+    const bg=this.add.graphics().setDepth(-20);for(const r of REGIONS){bg.fillGradientStyle(r.sky,r.sky,0x152d28,0x152d28).fillRect(r.x,0,r.width,900);for(let x=r.x+80;x<r.x+r.width;x+=210){const h=180+((x*17)%180);bg.fillStyle(0x153e2c,.45).fillTriangle(x,GROUND_Y,x+130,GROUND_Y,x+65,GROUND_Y-h);bg.fillStyle(0x09291f,.6).fillRect(x+54,GROUND_Y-h+80,22,h-80)}}
+    const far=this.add.graphics().setDepth(-15);for(let x=0;x<WORLD_W;x+=160){const c=REGIONS.find(r=>x>=r.x&&x<r.x+r.width)?.ground||0x2c8c45;far.fillStyle(c,.7).fillCircle(x+40,650-(x%5)*10,95).fillCircle(x+100,640,80)}
+    for(let x=150;x<WORLD_W;x+=310){const d=this.add.image(x,150+(x%4)*78,'feather').setDepth(-10).setAlpha(.12).setScale(1.5);this.tweens.add({targets:d,y:'+=25',duration:2200+(x%900),yoyo:true,repeat:-1,ease:'Sine.inOut'})}
+  }
+  private createPlatforms(){
+    this.platforms=this.physics.add.staticGroup();for(const [x,y,w,h] of PLATFORMS){const r=REGIONS.find(a=>x>=a.x&&x<a.x+a.width)!;const p=this.platforms.create(x+w/2,y+h/2,'pixel') as Phaser.Physics.Arcade.Image;p.setDisplaySize(w,h).setTint(r.ground).refreshBody().setDepth(1);const top=this.add.tileSprite(x+w/2,y+5,w,12,'pixel').setTint(r.accent).setAlpha(.65).setDepth(2)}
+  }
+  private createProps(){
+    const deco=this.add.graphics().setDepth(3);for(let x=120;x<WORLD_W;x+=270){const base=this.floorAt(x);if(base>780)continue;const r=REGIONS.find(a=>x>=a.x&&x<a.x+a.width)!;deco.fillStyle(0x4b3825).fillRect(x,base-80,13,80);deco.fillStyle(r.ground).fillCircle(x+6,base-96,40).fillCircle(x-18,base-80,30).fillCircle(x+30,base-78,27);deco.fillStyle(r.accent,.75).fillCircle(x-10,base-91,5).fillCircle(x+20,base-108,4)}
+    [1320,3370,5100,7040].forEach((x,i)=>{const y=this.floorAt(x)-85;const cp=this.add.sprite(x,y,'checkpoint

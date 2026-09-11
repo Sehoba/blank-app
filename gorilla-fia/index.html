@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#07140d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>Gorilla & Fia: Die Dschungelkrone</title>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="hud" class="hidden">
+      <div class="topbar">
+        <div id="hearts" class="hearts"></div>
+        <button id="stats" class="hudbtn" aria-label="RPG Werte">LV <span id="level">1</span></button>
+        <div id="region" class="region">MOOSPFAD</div>
+        <div class="counter"><span class="feather">◆</span><span id="feathers">0/30</span></div>
+        <button id="pause" class="hudbtn" aria-label="Pause">Ⅱ</button>
+      </div>
+      <div id="objective" class="objective">Finde die ersten Kronenfedern</div>
+      <div id="xpbar" class="xpbar"><i id="xpfill"></i><span id="xptext">XP 0/70</span></div>
+      <div id="bossbar" class="bossbar hidden"><span id="bossname">DER HOHLKÖNIG</span><div><i id="bossfill"></i></div></div>
+      <div id="touch" class="touch">
+        <div id="stick" class="stick"><i></i></div>
+        <button id="jump" class="action jump">▲<small>SPRUNG</small></button>
+        <button id="attack" class="action attack">✦<small>SCHLAG</small></button>
+        <button id="shoot" class="action shoot">🥚<small>EISCHUSS</small></button>
+        <button id="power" class="action power">◉<small>STAMPFER</small></button>
+      </div>
+      <div id="toast" class="toast"></div>
+    </div>
+    <div id="menu" class="screen">
+      <div class="logo"><span>GORILLA</span><b>&amp; FIA</b><em>DIE DSCHUNGELKRONE</em></div>
+      <div class="hero-art"><img src="./app-icon.png" alt="Gorilla mit Fia im Flamingo-Rucksack" /></div>
+      <p>Pixel-Action mit RPG-Fortschritt, Eischuss und zwei großen Levels</p>
+      <button id="start" class="primary">NEUES ABENTEUER</button>
+      <button id="continue" class="secondary hidden">WEITERSPIELEN</button>
+      <button id="level2" class="secondary">LEVEL 2 · RUINEN VON MOKU</button>
+    </div>
+    <div id="modal" class="screen hidden"><div class="panel"><h2 id="modal-title">PAUSE</h2><p id="modal-text"></p><button id="resume" class="primary">WEITER</button><button id="restart" class="secondary">NEU STARTEN</button></div></div>
+    <div id="skillpanel" class="screen hidden"><div class="panel skillpanel">
+      <h2>RPG · SKILLS</h2><p id="skillsummary">Level 1 · 0 Skillpunkte</p>
+      <div class="statrow"><span>💪 Stärke</span><b id="stat-strength">1</b><button data-skill="strength">+</button></div>
+      <div class="statrow"><span>🛡 Verteidigung</span><b id="stat-defense">1</b><button data-skill="defense">+</button></div>
+      <div class="statrow"><span>❤️ Vitalität</span><b id="stat-vitality">1</b><button data-skill="vitality">+</button></div>
+      <div class="statrow"><span>⚡ Beweglichkeit</span><b id="stat-agility">1</b><button data-skill="agility">+</button></div>
+      <div class="statrow"><span>🥚 Eierkraft</span><b id="stat-eggPower">1</b><button data-skill="eggPower">+</button></div>
+      <p class="hint">Je Levelaufstieg: +2 Skillpunkte. Werte werden sofort gespeichert.</p>
+      <button id="stats-close" class="primary">ZURÜCK INS SPIEL</button>
+    </div></div>
+    <script type="module" src="/src/main.ts"></script>
+    <script>
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+      }
+    </script>
+  </body>
+</html>

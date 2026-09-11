@@ -1,0 +1,12 @@
+/* Gorilla & Fia Hauptstil: direkt aus dem Moku-Prototyp abgeleitete Pixel-/GBA-Anmutung */
+html,body,#game{background:#101714;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace}
+canvas{image-rendering:pixelated!important;image-rendering:crisp-edges!important;filter:saturate(.96) contrast(1.05)}
+.screen{background:radial-gradient(circle at 50% 38%,rgba(46,125,66,.34),rgba(16,23,20,.97) 66%),repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.018) 3px 4px)}
+.logo{filter:drop-shadow(4px 5px 0 #1a261f);transform:none}.logo span,.logo b{-webkit-text-stroke:0;text-shadow:3px 3px 0 #2a1b16}.logo span{color:#ffd85c}.logo b{color:#ff76a8}.logo em{color:#dcebd5;letter-spacing:3px}
+.screen button,.panel button{border:2px solid #ffffff70;border-radius:8px;box-shadow:4px 4px 0 #111a;font-family:inherit}.primary{background:#c8a35e}.secondary{background:#84907b!important;box-shadow:4px 4px 0 #111a!important;color:#fff!important}
+.topbar{gap:8px;text-shadow:2px 2px 0 #101714}.region,.objective,.hudbtn,#pause,.toast,.xpbar,.bossbar>div{background:#111d;border:2px solid #fff5;border-radius:7px;box-shadow:3px 3px 0 #0006}.region{color:#fff;font-family:inherit;letter-spacing:1px}.objective{color:#eee;font-family:inherit}.counter{font-family:inherit}.xpbar{height:16px}.xpbar i{background:linear-gradient(90deg,#c8a35e,#8bd85e)}
+.stick{border-radius:16px;border:2px solid #fff7;background:#111a;box-shadow:4px 4px 0 #0007}.stick i{border-radius:12px;background:#c8a35ecc;border:2px solid #fff8;box-shadow:2px 2px 0 #0007}
+.action{border-radius:16px;border:2px solid #fff7;box-shadow:4px 4px 0 #0007,inset 0 -5px #0003;font-family:inherit}.jump{background:#496ea5}.attack{background:#a35b2a}.power{background:#6c4b9a}.shoot{background:#c8a35e;color:#111}.action small{font-family:inherit;letter-spacing:0}
+.panel{border:3px solid #b38db7;background:linear-gradient(160deg,#1a261f,#101714);box-shadow:8px 8px 0 #0008}.panel h2{color:#ffd85c;text-shadow:2px 2px 0 #2a1b16}.statrow{border:2px solid #ffffff25;border-radius:4px;background:#111a}.statrow b{color:#ffd85c}.statrow button{background:#c8a35e;border:2px solid #fff6;border-radius:4px;box-shadow:2px 2px 0 #0008}
+.hearts{color:#ff5963}.bossbar{color:#ffd75a}.bossbar i{background:#a35b2a}.toast{color:#ffd85c}
+@media(max-width:700px){.region{max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.objective{max-width:70vw;text-align:center}.topbar{left:8px;right:8px}.action{width:72px;height:72px}.shoot{width:64px;height:64px}}
